@@ -1,0 +1,53 @@
+# Unnecessary directories
+# Dependencies
+node_modules/
+jspm_packages/
+typings/
+
+# Build and Distribution Outputs
+dist/
+dist_electron/
+build/
+out/
+*.tgz
+
+# Vue/Vite Specifics
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# Ignore auto-generated TS declaration files from Vue plugins if desired
+components.d.ts
+
+# Electron/Electron-Builder Specifics
+# Often used for packaged desktop apps
+release/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.zip
+
+# Logs and Debug
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment Secrets
+.env
+.env.local
+.env.*.local
+
+# OS Specific
+.DS_Store
+Thumbs.db
+
+# IDE Configs
+.idea

@@ -1,0 +1,162 @@
+[
+  {
+    "id": "ANA",
+    "name": "Anaheim Ducks",
+    "ahl_affiliate": "San Diego Gulls"
+  },
+  {
+    "id": "BOS",
+    "name": "Boston Bruins",
+    "ahl_affiliate": "Providence Bruins"
+  },
+  {
+    "id": "BUF",
+    "name": "Buffalo Sabres",
+    "ahl_affiliate": "Rochester Americans"
+  },
+  {
+    "id": "CAR",
+    "name": "Carolina Hurricanes",
+    "ahl_affiliate": "Chicago Wolves"
+  },
+  {
+    "id": "CBJ",
+    "name": "Columbus Blue Jackets",
+    "ahl_affiliate": "Cleveland Monsters"
+  },
+  {
+    "id": "CGY",
+    "name": "Calgary Flames",
+    "ahl_affiliate": "Calgary Wranglers"
+  },
+  {
+    "id": "CHI",
+    "name": "Chicago Blackhawks",
+    "ahl_affiliate": "Rockford IceHogs"
+  },
+  {
+    "id": "COL",
+    "name": "Colorado Avalanche",
+    "ahl_affiliate": "Colorado Eagles"
+  },
+  {
+    "id": "DAL",
+    "name": "Dallas Stars",
+    "ahl_affiliate": "Texas Stars"
+  },
+  {
+    "id": "DET",
+    "name": "Detroit Red Wings",
+    "ahl_affiliate": "Grand Rapids Griffins"
+  },
+  {
+    "id": "EDM",
+    "name": "Edmonton Oilers",
+    "ahl_affiliate": "Bakersfield Condors"
+  },
+  {
+    "id": "FLA",
+    "name": "Florida Panthers",
+    "ahl_affiliate": "Charlotte Checkers"
+  },
+  {
+    "id": "LAK",
+    "name": "Los Angeles Kings",
+    "ahl_affiliate": "Ontario Reign"
+  },
+  {
+    "id": "MIN",
+    "name": "Minnesota Wild",
+    "ahl_affiliate": "Iowa Wild"
+  },
+  {
+    "id": "MTL",
+    "name": "Montreal Canadiens",
+    "ahl_affiliate": "Laval Rocket"
+  },
+  {
+    "id": "NJD",
+    "name": "New Jersey Devils",
+    "ahl_affiliate": "Utica Comets"
+  },
+  {
+    "id": "NSH",
+    "name": "Nashville Predators",
+    "ahl_affiliate": "Milwaukee Admirals"
+  },
+  {
+    "id": "NYI",
+    "name": "New York Islanders",
+    "ahl_affiliate": "Bridgeport Islanders"
+  },
+  {
+    "id": "NYR",
+    "name": "New York Rangers",
+    "ahl_affiliate": "Hartford Wolf Pack"
+  },
+  {
+    "id": "OTT",
+    "name": "Ottawa Senators",
+    "ahl_affiliate": "Belleville Senators"
+  },
+  {
+    "id": "PHI",
+    "name": "Philadelphia Flyers",
+    "ahl_affiliate": "Lehigh Valley Phantoms"
+  },
+  {
+    "id": "PIT",
+    "name": "Pittsburgh Penguins",
+    "ahl_affiliate": "Wilkes-Barre/Scranton Penguins"
+  },
+  {
+    "id": "SEA",
+    "name": "Seattle Kraken",
+    "ahl_affiliate": "Coachella Valley Firebirds"
+  },
+  {
+    "id": "SJS",
+    "name": "San Jose Sharks",
+    "ahl_affiliate": "San Jose Barracuda"
+  },
+  {
+    "id": "STL",
+    "name": "St. Louis Blues",
+    "ahl_affiliate": "Springfield Thunderbirds"
+  },
+  {
+    "id": "TBL",
+    "name": "Tampa Bay Lightning",
+    "ahl_affiliate": "Syracuse Crunch"
+  },
+  {
+    "id": "TOR",
+    "name": "Toronto Maple Leafs",
+    "ahl_affiliate": "Toronto Marlies"
+  },
+  {
+    "id": "UTA",
+    "name": "Utah Mammoth",
+    "ahl_affiliate": "Tucson Roadrunners"
+  },
+  {
+    "id": "VAN",
+    "name": "Vancouver Canucks",
+    "ahl_affiliate": "Abbotsford Canucks"
+  },
+  {
+    "id": "VGK",
+    "name": "Vegas Golden Knights",
+    "ahl_affiliate": "Henderson Silver Knights"
+  },
+  {
+    "id": "WPG",
+    "name": "Winnipeg Jets",
+    "ahl_affiliate": "Manitoba Moose"
+  },
+  {
+    "id": "WSH",
+    "name": "Washington Capitals",
+    "ahl_affiliate": "Hershey Bears"
+  }
+]
