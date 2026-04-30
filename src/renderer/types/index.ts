@@ -43,6 +43,7 @@ export interface Player {
     position: Position;
     position2: Position | null;
     age: number;
+    roster_league: League | null;
     junior_league: JuniorLeague | null;
     overall: number;
     potential_level: PotentialLevel;
@@ -73,4 +74,10 @@ export interface Franchise {
     team_id: string | null;
     season: number;
     created_at: string;
+}
+
+declare global {
+    interface Window {
+        db: Record<string, (...args: unknown[]) => Promise<unknown>>;
+    }
 }

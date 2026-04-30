@@ -21,6 +21,7 @@ function createSchema() {
             position          TEXT    NOT NULL,
             position2         TEXT    DEFAULT NULL,
             age               INTEGER NOT NULL DEFAULT 25,
+            roster_league     TEXT    DEFAULT NULL,
             junior_league     TEXT    DEFAULT NULL,
             overall           INTEGER NOT NULL DEFAULT 70,
             potential_level   TEXT    NOT NULL DEFAULT '',
@@ -74,14 +75,14 @@ function getAllPlayers() {
 function addPlayer(player: Record<string, unknown>) {
     const result = db.prepare(`
         INSERT INTO players (
-            first_name, last_name, position, position2, age, junior_league, 
-            overall, potential_level, potential_chance, player_type, role,
-            aav, years_remaining, contract_type, clause, waiver_eligible,
+            first_name, last_name, position, position2, age, roster_league, 
+            junior_league, overall, potential_level, potential_chance, player_type,
+            role, aav, years_remaining, contract_type, clause, waiver_eligible,
             status, notes, line_slot, line_league
         ) VALUES (
-            @first_name, @last_name, @position, @position2, @age, @junior_league,
-            @overall, @potential_level, @potential_chance, @player_type, @role,
-            @aav, @years_remaining, @contract_type, @clause, @waiver_eligible,
+            @first_name, @last_name, @position, @position2, @age, @roster_league,
+            @junior_league, @overall, @potential_level, @potential_chance, @player_type,
+            @role, @aav, @years_remaining, @contract_type, @clause, @waiver_eligible,
             @status, @notes, @line_slot, @line_league
         )
     `).run(player);
