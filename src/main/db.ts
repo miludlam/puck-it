@@ -21,7 +21,7 @@ function createSchema() {
             position          TEXT    NOT NULL,
             position2         TEXT    DEFAULT NULL,
             age               INTEGER NOT NULL DEFAULT 25,
-            roster_league     TEXT    DEFAULT NULL,
+            roster_league     TEXT    NOT NULL DEFAULT 'NHL',
             junior_league     TEXT    DEFAULT NULL,
             overall           INTEGER NOT NULL DEFAULT 70,
             potential_level   TEXT    NOT NULL DEFAULT '',

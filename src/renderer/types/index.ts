@@ -43,7 +43,7 @@ export interface Player {
     position: Position;
     position2: Position | null;
     age: number;
-    roster_league: League | null;
+    roster_league: League;
     junior_league: JuniorLeague | null;
     overall: number;
     potential_level: PotentialLevel;
