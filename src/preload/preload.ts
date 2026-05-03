@@ -8,6 +8,7 @@ const channels = [
     'player:delete',
     'franchise:get',
     'franchise:update',
+    'teams:get',
 ];
 
 const api: Record<string, (...args: unknown[]) => Promise<unknown>> = {};

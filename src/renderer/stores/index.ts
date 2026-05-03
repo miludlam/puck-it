@@ -85,7 +85,8 @@ export const useFranchiseStore = defineStore('franchise', () => {
         franchise.value = result as Franchise;
     }
     async function loadTeams() {
-        // TODO
+        const result = await window.db['teams:get']();
+        teams.value = result as Team[];
     }
     async function update(teamID: string, season: number) {
         const result = await window.db['franchise:update'](teamID, season);

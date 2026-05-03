@@ -1,8 +1,16 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { initDB, dbHandlers } from './db';
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+function getResourcePath(filename: string) {
+    if (app.isPackaged) {
+        return path.join(process.resourcesPath, filename);
+    }
+    return path.join(app.getAppPath(), 'resources', filename);
+}
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -41,6 +49,12 @@ app.whenReady().then(() => {
     for (const [channel, handler] of Object.entries(dbHandlers)) {
         ipcMain.handle(channel, handler);
     }
+
+    ipcMain.handle('teams:get', () => {
+        const teamsPath = getResourcePath('teams.json');
+        const raw = fs.readFileSync(teamsPath, 'utf8');
+        return JSON.parse(raw);
+    });
 
     createWindow();
 

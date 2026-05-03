@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {onMounted} from 'vue';
-import {usePlayerStore, useFranchiseStore} from "@/stores";
+import { onMounted } from 'vue';
+import { usePlayerStore, useFranchiseStore } from "@/stores";
 
 const playerStore = usePlayerStore();
 const franchiseStore = useFranchiseStore();
@@ -8,6 +8,7 @@ const franchiseStore = useFranchiseStore();
 onMounted(async () => {
     await Promise.all([
         franchiseStore.load(),
+        franchiseStore.loadTeams(),
         playerStore.load(),
     ]);
 })
