@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { Franchise, League, Player, Team } from "@/types";
+import { Franchise, Player, Team } from "@/types";
 
-// Some helper functions
+// Reserved for future use when deriving effective league for unassigned players
 function isJuniorIneligible(player: Player): boolean {
     return player.junior_league !== null && player.age < 21;
 }
@@ -46,8 +46,10 @@ export const usePlayerStore = defineStore('players', () => {
     async function update(id: number, player: Partial<Player>) {
         const result = await window.db['player:update'](id, player);
         const updated = result as Player;
+
         const index = players.value.findIndex(p => p.id === id);
         if (index !== -1) players.value[index] = updated;
+
         return updated;
     }
     async function remove(id: number) {
@@ -64,6 +66,35 @@ export const usePlayerStore = defineStore('players', () => {
 });
 
 export const useFranchiseStore = defineStore('franchise', () => {
+    // State mgmt
     const franchise = ref<Franchise | null>(null);
     const teams = ref<Team[]>([]);
+
+    // More header content
+    const currentTeam = computed(() =>
+        teams.value.find(team => team.id === franchise.value?.team_id) ?? null
+    );
+    const formattedSeason = computed(() => {
+        const year = franchise.value?.season ?? 25;
+        return `${year}/${String(year + 1).slice(-2)}`;
+    });
+
+    // Actions
+    async function load() {
+        const result = await window.db['franchise:get']();
+        franchise.value = result as Franchise;
+    }
+    async function loadTeams() {
+        // TODO
+    }
+    async function update(teamID: string, season: number) {
+        const result = await window.db['franchise:update'](teamID, season);
+        franchise.value = result as Franchise;
+    }
+
+    return {
+        franchise, teams,
+        currentTeam, formattedSeason,
+        load, loadTeams, update,
+    };
 });
