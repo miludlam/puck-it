@@ -2,7 +2,6 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { initDB, dbHandlers } from './db';
-import { createRouter, createWebHashHistory } from 'vue-router';
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 

@@ -1,11 +1,41 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useFranchiseStore, usePlayerStore } from '@/stores';
 
+// Load the stores
+const franchiseStore = useFranchiseStore();
+const playerStore = usePlayerStore();
+
+// Constants
+const CAP_CEILING = 88;
+const MAX_CONTRACTS = 50;
+const MAX_ROSTER = 23;
+
+/* Helpers */
+// Contracts display three significant figures
+function formatCap(value: number): string {
+    return `$${value.toFixed(3)}M`;
+}
+
+const teamName = computed(() =>
+    franchiseStore.currentTeam?.name ?? 'No team selected'
+);
+const contractCount = computed(() =>
+    playerStore.contractCount
+);
+const nhlCapHit = computed(() =>
+    formatCap(playerStore.nhlCapHit)
+);
+const nhlRosterCount = computed(() =>
+    playerStore.nhlRosterCount
+);
 </script>
 
 <template>
-
+    <header class="h-12 bg-slate-900 flex items-center px-6 gap-x-8">
+        <span class="text-sm font-medium">{{ teamName }} · {{ franchiseStore.formattedSeason }}</span>
+        <span class="text-sm font-medium">Contracts: {{ contractCount }} / {{ MAX_CONTRACTS }}</span>
+        <span class="text-sm font-medium">Cap: {{ nhlCapHit }} / {{ formatCap(CAP_CEILING) }}</span>
+        <span class="text-sm font-medium">NHL Players: {{ nhlRosterCount }} / {{ MAX_ROSTER }}</span>
+    </header>
 </template>
-
-<style scoped>
-
-</style>
