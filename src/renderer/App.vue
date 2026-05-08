@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
+import AppHeader from '@/components/AppHeader.vue';
+import AppSidebar from '@/components/AppSidebar.vue';
+
 import { usePlayerStore, useFranchiseStore } from "@/stores";
 
 const playerStore = usePlayerStore();
@@ -15,10 +18,13 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="flex h-screen bg-slate-950 text-slate-100 items-center justify-center">
-        <div class="text-center space-y-2">
-            <h1 class="text-3xl font-semibold tracking-tight">🏒 Puck It</h1>
-            <p class="text-slate-500 text-sm">GM companion — scaffold ready</p>
+    <div class="flex flex-col h-screen">
+        <AppHeader />
+        <div class="flex flex-1 overflow-hidden">
+            <AppSidebar />
+            <main class="flex-1 overflow-y-auto">
+                <RouterView />
+            </main>
         </div>
     </div>
 </template>

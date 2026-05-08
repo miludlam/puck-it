@@ -32,7 +32,8 @@ const nhlRosterCount = computed(() =>
 </script>
 
 <template>
-    <header class="h-12 bg-slate-900 flex items-center px-6 gap-x-8">
+    <header class="h-12 bg-slate-900 flex items-center pr-6 gap-x-8">
+        <div class="w-20 flex-shrink-0 drag-region" />
         <span class="text-sm font-medium">{{ teamName }} · {{ franchiseStore.formattedSeason }}</span>
         <span class="text-sm font-medium">Contracts: {{ contractCount }} / {{ MAX_CONTRACTS }}</span>
         <span class="text-sm font-medium">Cap: {{ nhlCapHit }} / {{ formatCap(CAP_CEILING) }}</span>
