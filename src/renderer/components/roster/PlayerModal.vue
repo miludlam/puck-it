@@ -75,7 +75,7 @@ const form = reactive<Omit<Player, 'id' | 'created_at'>>({
     years_remaining: 0,
     contract_type: null,
     clause: null,
-    waiver_eligible: true,
+    waiver_eligible: 1,
     roster_league: 'NHL',
     role: '',
     status: 'Active',
@@ -115,11 +115,13 @@ const playerTypeOptions = computed(() => {
 });
 
 async function save() {
+    const payload = { ...form };
+
     if (props.player) {
-        const updated = await playerStore.update(props.player.id, form);
+        const updated = await playerStore.update(props.player.id, payload);
         emit('saved', updated);
     } else {
-        const created = await playerStore.add(form);
+        const created = await playerStore.add(payload);
         emit('saved', created);
     }
     emit('close');
@@ -295,8 +297,8 @@ watch(positionGroup, () => {
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Waiver Eligible</label>
                         <select v-model="form.waiver_eligible" :class="inputClass">
-                            <option :value="true">Yes</option>
-                            <option :value="false">No</option>
+                            <option :value="1">Yes</option>
+                            <option :value="0">No</option>
                         </select>
                     </div>
                 </div>

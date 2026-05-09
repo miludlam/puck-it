@@ -53,7 +53,7 @@ export interface Player {
     years_remaining: number;
     contract_type: ContractType | null;
     clause: Clause | null;
-    waiver_eligible: boolean;
+    waiver_eligible: number;
     status: PlayerStatus;
     notes: string | null;
     line_slot: string | null;
@@ -63,10 +63,17 @@ export interface Player {
 }
 
 // Matches teams.json
+export interface TeamColors {
+    primary: string;
+    secondary: string;
+    tertiary: string;
+}
+
 export interface Team {
     id: string;
     name: string;
     ahl_affiliate: string;
+    colors: TeamColors;
 }
 
 export interface Franchise {

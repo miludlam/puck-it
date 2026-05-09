@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import PlayerModal from '@/components/roster/PlayerModal.vue';
-import AllPlayersTable from "@/components/roster/AllPlayersTable.vue";
 import { Player } from '@/types';
+import AllPlayersTable from '@/components/roster/AllPlayersTable.vue';
+import PlayerModal from '@/components/roster/PlayerModal.vue';
 
 const showModal = ref(false);
 const selectedPlayer = ref<Player | undefined>(undefined);
@@ -33,7 +33,7 @@ function onClose() {
             >+ Add Player</button>
         </div>
 
-        <AllPlayersTable />
+        <AllPlayersTable @edit-player="openEdit" />
 
         <PlayerModal
             v-if="showModal"

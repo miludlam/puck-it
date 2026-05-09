@@ -55,21 +55,11 @@ function createSchema() {
 /*******************
  * Player Handlers *
  *******************/
-/* Helper function to map waiver_eligible to boolean which is invoked by most player-based functions */
-function mapPlayer(row: Record<string, unknown>) {
-    return {
-        ...row,
-        waiver_eligible: row.waiver_eligible === 1,
-    };
-}
-
 function getAllPlayers() {
-    const rows = db.prepare(`
+    return db.prepare(`
         SELECT * FROM players
         ORDER BY last_name ASC, first_name ASC
     `).all() as Record<string, unknown>[];
-
-    return rows.map(mapPlayer);
 }
 
 function addPlayer(player: Record<string, unknown>) {
@@ -87,10 +77,8 @@ function addPlayer(player: Record<string, unknown>) {
         )
     `).run(player);
 
-    const row = db.prepare('SELECT * FROM players WHERE id = ?')
+    return db.prepare('SELECT * FROM players WHERE id = ?')
         .get(result.lastInsertRowid) as Record<string, unknown>;
-
-    return mapPlayer(row);
 }
 
 function updatePlayer(id: number, player: Record<string, unknown>) {
@@ -101,10 +89,8 @@ function updatePlayer(id: number, player: Record<string, unknown>) {
     db.prepare(`UPDATE players SET ${fields} WHERE id = @id`)
         .run({ ...player, id });
 
-    const row = db.prepare('SELECT * FROM players WHERE id = ?')
+    return db.prepare('SELECT * FROM players WHERE id = ?')
         .get(id) as Record<string, unknown>;
-
-    return mapPlayer(row);
 }
 
 function deletePlayer(id: number) {
