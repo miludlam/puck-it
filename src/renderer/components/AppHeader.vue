@@ -35,7 +35,10 @@ const showModal = ref(false);
 </script>
 
 <template>
-    <header class="h-12 bg-slate-900 flex items-center pr-6 gap-x-8">
+    <header
+        class="h-12 bg-slate-900 flex items-center pr-6 gap-x-8 border-b-2"
+        :style="{ borderColor: 'var(--team-primary)' }"
+    >
         <div class="w-20 flex-shrink-0 drag-region" />
         <span
             class="text-sm font-medium cursor-pointer hover:text-slate-300 transition-colors no-drag"

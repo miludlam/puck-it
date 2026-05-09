@@ -14,8 +14,15 @@ export function useTeamTheme() {
     }
 
     watch(
-        () => franchiseStore.franchise?.team_id,
-        (teamId) => applyTheme(teamId ?? null),
+        [
+            () => franchiseStore.franchise?.team_id,
+            () => franchiseStore.teams,
+        ],
+        ([teamId, teams]) => {
+            if (teamId && teams.length > 0) {
+                applyTheme(teamId);
+            }
+        },
         { immediate: true }
     );
 

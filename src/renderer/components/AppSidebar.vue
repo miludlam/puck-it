@@ -18,8 +18,9 @@ const navItems = [
             :to="item.path"
             class="block px-3 py-2 rounded-lg text-sm transition-colors"
             :class="route.path === item.path
-                ? 'bg-slate-700 text-slate-100 font-medium'
+                ? 'text-white font-medium'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'"
+            :style="route.path === item.path ? { backgroundColor: 'var(--team-primary)' } : {}"
         >
             {{ item.label }}
         </RouterLink>

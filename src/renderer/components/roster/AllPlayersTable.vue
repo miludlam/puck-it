@@ -20,11 +20,9 @@ interface Column {
 const columns: Column[] = [
     { key: 'name',             label: 'Name',            visible: ref(true), sortable: true  },
     { key: 'position',         label: 'Position',        visible: ref(true), sortable: true  },
-    { key: 'position2',        label: 'Second Position', visible: ref(true), sortable: false },
     { key: 'roster_league',    label: 'League',          visible: ref(true), sortable: true  },
     { key: 'overall',          label: 'OVR',             visible: ref(true), sortable: true  },
     { key: 'potential_level',  label: 'Potential',       visible: ref(true), sortable: true  },
-    { key: 'potential_chance', label: 'Chance',          visible: ref(true), sortable: true  },
     { key: 'player_type',      label: 'Type',            visible: ref(true), sortable: true  },
     { key: 'role',             label: 'Role',            visible: ref(true), sortable: true  },
     { key: 'age',              label: 'Age',             visible: ref(true), sortable: true  },
@@ -141,7 +139,7 @@ function resetSort() {
 
 function formatCell(player: Player, key: string): string {
     switch (key) {
-        case 'name':            return `${player.last_name}, ${player.first_name}`;
+        case 'name':            return `${player.first_name.charAt(0)}. ${player.last_name}`;
         case 'aav':             return player.aav ? `$${player.aav.toFixed(3)}M` : '—';
         case 'waiver_eligible': return player.waiver_eligible ? 'Y' : 'N';
         case 'potential_level': return `${player.potential_level} (${player.potential_chance})`;
@@ -302,7 +300,10 @@ const filteredAndSorted = computed(() => {
                     :key="col.key"
                     @click="col.sortable ? handleColumnClick(col.key as SortableColumn, $event) : null"
                     class="px-3 py-2 text-left text-xs font-medium text-slate-400 whitespace-nowrap"
-                    :class="col.sortable ? 'cursor-pointer hover:text-slate-200' : ''"
+                    :class="[
+                        col.key === 'name' ? 'text-left' : 'text-center',
+                        col.sortable ? 'cursor-pointer hover:text-slate-200' : ''
+                    ]"
                 >
                     {{ col.label }}
                     <!-- sort indicator -->
@@ -335,9 +336,32 @@ const filteredAndSorted = computed(() => {
                     <td
                         v-for="col in columns.filter(c => c.visible.value)"
                         :key="col.key"
-                        class="px-3 py-2 text-slate-300 whitespace-nowrap"
+                        class="px-3 py-2 whitespace-nowrap"
+                        :class="col.key === 'name' ? 'text-left' : 'text-center'"
                     >
-                        {{ formatCell(player, col.key) }}
+                        <template v-if="col.key === 'roster_league'">
+                            <span
+                                class="px-2 py-0.5 rounded text-xs font-medium"
+                                :class="{
+                                    'bg-blue-500/20 text-blue-300':   player.roster_league === 'NHL',
+                                    'bg-violet-500/20 text-violet-300': player.roster_league === 'AHL',
+                                    'bg-slate-500/20 text-slate-400':  player.roster_league === 'ITS',
+                                }"
+                            >{{ player.roster_league }}</span>
+                        </template>
+                        <template v-else-if="col.key === 'position'">
+                            <span
+                                class="px-2 py-0.5 rounded text-xs font-medium"
+                                :class="{
+                                    'bg-blue-500/20 text-blue-300':   getPositionGroup(player.position) === 'FWD',
+                                    'bg-violet-500/20 text-violet-300':  getPositionGroup(player.position) === 'DEF',
+                                    'bg-slate-500/20 text-slate-400':  getPositionGroup(player.position) === 'G',
+                                }"
+                            >{{ player.position }}{{ player.position2 ? ` / ${player.position2}` : '' }}</span>
+                        </template>
+                        <template v-else>
+                            {{ formatCell(player, col.key) }}
+                        </template>
                     </td>
                 </tr>
             </template>

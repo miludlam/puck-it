@@ -28,7 +28,8 @@ function onClose() {
         <div class="flex items-center justify-between mb-6">
             <h1 class="text-xl font-semibold">Roster</h1>
             <button
-                class="px-4 py-2 rounded-lg text-sm bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors"
+                class="px-4 py-2 rounded-lg text-sm hover:bg-sky-500 text-white font-medium transition-colors"
+                :style="{ backgroundColor: 'var(--team-primary)' }"
                 @click="openAdd"
             >+ Add Player</button>
         </div>
