@@ -2,161 +2,193 @@
   {
     "id": "ANA",
     "name": "Anaheim Ducks",
-    "ahl_affiliate": "San Diego Gulls"
+    "ahl_affiliate": "San Diego Gulls",
+    "colors": { "primary": "#F47A38", "secondary": "#B9975B", "tertiary": "#C1C6C8" }
   },
   {
     "id": "BOS",
     "name": "Boston Bruins",
-    "ahl_affiliate": "Providence Bruins"
+    "ahl_affiliate": "Providence Bruins",
+    "colors": { "primary": "#FFB81C", "secondary": "#000000", "tertiary": "#FFFFFF" }
   },
   {
     "id": "BUF",
     "name": "Buffalo Sabres",
-    "ahl_affiliate": "Rochester Americans"
+    "ahl_affiliate": "Rochester Americans",
+    "colors": { "primary": "#003087", "secondary": "#FCB514", "tertiary": "#FFFFFF" }
   },
   {
     "id": "CAR",
     "name": "Carolina Hurricanes",
-    "ahl_affiliate": "Chicago Wolves"
+    "ahl_affiliate": "Chicago Wolves",
+    "colors": { "primary": "#CC0000", "secondary": "#000000", "tertiary": "#A2AAAD" }
   },
   {
     "id": "CBJ",
     "name": "Columbus Blue Jackets",
-    "ahl_affiliate": "Cleveland Monsters"
+    "ahl_affiliate": "Cleveland Monsters",
+    "colors": { "primary": "#002654", "secondary": "#CE1126", "tertiary": "#A4A9AD" }
   },
   {
     "id": "CGY",
     "name": "Calgary Flames",
-    "ahl_affiliate": "Calgary Wranglers"
+    "ahl_affiliate": "Calgary Wranglers",
+    "colors": { "primary": "#C8102E", "secondary": "#F1BE48", "tertiary": "#000000" }
   },
   {
     "id": "CHI",
     "name": "Chicago Blackhawks",
-    "ahl_affiliate": "Rockford IceHogs"
+    "ahl_affiliate": "Rockford IceHogs",
+    "colors": { "primary": "#CF0A2C", "secondary": "#000000", "tertiary": "#FFB81C" }
   },
   {
     "id": "COL",
     "name": "Colorado Avalanche",
-    "ahl_affiliate": "Colorado Eagles"
+    "ahl_affiliate": "Colorado Eagles",
+    "colors": { "primary": "#6F263D", "secondary": "#236192", "tertiary": "#A2AAAD" }
   },
   {
     "id": "DAL",
     "name": "Dallas Stars",
-    "ahl_affiliate": "Texas Stars"
+    "ahl_affiliate": "Texas Stars",
+    "colors": { "primary": "#006847", "secondary": "#8F8F8C", "tertiary": "#000000" }
   },
   {
     "id": "DET",
     "name": "Detroit Red Wings",
-    "ahl_affiliate": "Grand Rapids Griffins"
+    "ahl_affiliate": "Grand Rapids Griffins",
+    "colors": { "primary": "#CE1126", "secondary": "#FFFFFF", "tertiary": "#000000" }
   },
   {
     "id": "EDM",
     "name": "Edmonton Oilers",
-    "ahl_affiliate": "Bakersfield Condors"
+    "ahl_affiliate": "Bakersfield Condors",
+    "colors": { "primary": "#FF4C00", "secondary": "#003087", "tertiary": "#FFFFFF" }
   },
   {
     "id": "FLA",
     "name": "Florida Panthers",
-    "ahl_affiliate": "Charlotte Checkers"
+    "ahl_affiliate": "Charlotte Checkers",
+    "colors": { "primary": "#041E42", "secondary": "#C8102E", "tertiary": "#B9975B" }
   },
   {
     "id": "LAK",
     "name": "Los Angeles Kings",
-    "ahl_affiliate": "Ontario Reign"
+    "ahl_affiliate": "Ontario Reign",
+    "colors": { "primary": "#111111", "secondary": "#A2AAAD", "tertiary": "#FFFFFF" }
   },
   {
     "id": "MIN",
     "name": "Minnesota Wild",
-    "ahl_affiliate": "Iowa Wild"
+    "ahl_affiliate": "Iowa Wild",
+    "colors": { "primary": "#154734", "secondary": "#A6192E", "tertiary": "#EAAA00" }
   },
   {
     "id": "MTL",
     "name": "Montreal Canadiens",
-    "ahl_affiliate": "Laval Rocket"
+    "ahl_affiliate": "Laval Rocket",
+    "colors": { "primary": "#AF1E2D", "secondary": "#192168", "tertiary": "#FFFFFF" }
   },
   {
     "id": "NJD",
     "name": "New Jersey Devils",
-    "ahl_affiliate": "Utica Comets"
+    "ahl_affiliate": "Utica Comets",
+    "colors": { "primary": "#CE1126", "secondary": "#000000", "tertiary": "#FFFFFF" }
   },
   {
     "id": "NSH",
     "name": "Nashville Predators",
-    "ahl_affiliate": "Milwaukee Admirals"
+    "ahl_affiliate": "Milwaukee Admirals",
+    "colors": { "primary": "#FFB81C", "secondary": "#041E42", "tertiary": "#FFFFFF" }
   },
   {
     "id": "NYI",
     "name": "New York Islanders",
-    "ahl_affiliate": "Bridgeport Islanders"
+    "ahl_affiliate": "Bridgeport Islanders",
+    "colors": { "primary": "#00539B", "secondary": "#F47D30", "tertiary": "#FFFFFF" }
   },
   {
     "id": "NYR",
     "name": "New York Rangers",
-    "ahl_affiliate": "Hartford Wolf Pack"
+    "ahl_affiliate": "Hartford Wolf Pack",
+    "colors": { "primary": "#0038A8", "secondary": "#CE1126", "tertiary": "#FFFFFF" }
   },
   {
     "id": "OTT",
     "name": "Ottawa Senators",
-    "ahl_affiliate": "Belleville Senators"
+    "ahl_affiliate": "Belleville Senators",
+    "colors": { "primary": "#C8102E", "secondary": "#C69214", "tertiary": "#000000" }
   },
   {
     "id": "PHI",
     "name": "Philadelphia Flyers",
-    "ahl_affiliate": "Lehigh Valley Phantoms"
+    "ahl_affiliate": "Lehigh Valley Phantoms",
+    "colors": { "primary": "#F74902", "secondary": "#000000", "tertiary": "#FFFFFF" }
   },
   {
     "id": "PIT",
     "name": "Pittsburgh Penguins",
-    "ahl_affiliate": "Wilkes-Barre/Scranton Penguins"
+    "ahl_affiliate": "Wilkes-Barre/Scranton Penguins",
+    "colors": { "primary": "#FCB514", "secondary": "#000000", "tertiary": "#FFFFFF" }
   },
   {
     "id": "SEA",
     "name": "Seattle Kraken",
-    "ahl_affiliate": "Coachella Valley Firebirds"
+    "ahl_affiliate": "Coachella Valley Firebirds",
+    "colors": { "primary": "#001628", "secondary": "#99D9D9", "tertiary": "#C8102E" }
   },
   {
     "id": "SJS",
     "name": "San Jose Sharks",
-    "ahl_affiliate": "San Jose Barracuda"
+    "ahl_affiliate": "San Jose Barracuda",
+    "colors": { "primary": "#006D75", "secondary": "#EA7200", "tertiary": "#000000" }
   },
   {
     "id": "STL",
     "name": "St. Louis Blues",
-    "ahl_affiliate": "Springfield Thunderbirds"
+    "ahl_affiliate": "Springfield Thunderbirds",
+    "colors": { "primary": "#002F87", "secondary": "#FCB514", "tertiary": "#FFFFFF" }
   },
   {
     "id": "TBL",
     "name": "Tampa Bay Lightning",
-    "ahl_affiliate": "Syracuse Crunch"
+    "ahl_affiliate": "Syracuse Crunch",
+    "colors": { "primary": "#002868", "secondary": "#FFFFFF", "tertiary": "#000000" }
   },
   {
     "id": "TOR",
     "name": "Toronto Maple Leafs",
-    "ahl_affiliate": "Toronto Marlies"
+    "ahl_affiliate": "Toronto Marlies",
+    "colors": { "primary": "#003E7E", "secondary": "#FFFFFF", "tertiary": "#000000" }
   },
   {
     "id": "UTA",
     "name": "Utah Mammoth",
-    "ahl_affiliate": "Tucson Roadrunners"
+    "ahl_affiliate": "Tucson Roadrunners",
+    "colors": { "primary": "#6CACE4", "secondary": "#001F5B", "tertiary": "#78BE20" }
   },
   {
     "id": "VAN",
     "name": "Vancouver Canucks",
-    "ahl_affiliate": "Abbotsford Canucks"
+    "ahl_affiliate": "Abbotsford Canucks",
+    "colors": { "primary": "#00205B", "secondary": "#00843D", "tertiary": "#041C2C" }
   },
   {
     "id": "VGK",
     "name": "Vegas Golden Knights",
-    "ahl_affiliate": "Henderson Silver Knights"
+    "ahl_affiliate": "Henderson Silver Knights",
+    "colors": { "primary": "#B4975A", "secondary": "#333F42", "tertiary": "#C8102E" }
   },
   {
     "id": "WPG",
     "name": "Winnipeg Jets",
-    "ahl_affiliate": "Manitoba Moose"
+    "ahl_affiliate": "Manitoba Moose",
+    "colors": { "primary": "#041E42", "secondary": "#004C97", "tertiary": "#AC162C" }
   },
   {
     "id": "WSH",
     "name": "Washington Capitals",
-    "ahl_affiliate": "Hershey Bears"
+    "ahl_affiliate": "Hershey Bears",
+    "colors": { "primary": "#041E42", "secondary": "#C8102E", "tertiary": "#FFFFFF" }
   }
 ]
