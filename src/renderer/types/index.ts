@@ -49,7 +49,6 @@ export interface Player {
     potential_level: PotentialLevel;
     potential_chance: PotentialChance;
     player_type: PlayerType;
-    role: string;
     aav: number;
     years_remaining: number;
     contract_type: ContractType | null;
@@ -59,6 +58,7 @@ export interface Player {
     notes: string | null;
     line_slot: string | null;
     line_league: LineLeague | null;
+    role: string;
     created_at: string;
 }
 
