@@ -11,7 +11,7 @@ type SortableColumn = 'name' | 'position' | 'overall' | 'potential_level' |
     'waiver_eligible' | 'line_slot';
 
 interface Column {
-    key: SortableColumn | 'position2' | 'notes';
+    key: SortableColumn | 'notes';
     label: string;
     visible: Ref<boolean>;
     sortable: boolean;
@@ -144,7 +144,6 @@ function formatCell(player: Player, key: string): string {
         case 'waiver_eligible': return player.waiver_eligible ? 'Y' : 'N';
         case 'potential_level': return `${player.potential_level} (${player.potential_chance})`;
         case 'clause':          return player.clause ?? '—';
-        case 'position2':       return player.position2 ?? '—';
         case 'notes':           return player.notes ?? '—';
         default:                return String((player as any)[key] ?? '—');
     }
@@ -343,7 +342,7 @@ const filteredAndSorted = computed(() => {
                             <span
                                 class="px-2 py-0.5 rounded text-xs font-medium"
                                 :class="{
-                                    'bg-blue-500/20 text-blue-300':   player.roster_league === 'NHL',
+                                    'bg-sky-500/20 text-sky-300':   player.roster_league === 'NHL',
                                     'bg-violet-500/20 text-violet-300': player.roster_league === 'AHL',
                                     'bg-slate-500/20 text-slate-400':  player.roster_league === 'ITS',
                                 }"
@@ -355,7 +354,7 @@ const filteredAndSorted = computed(() => {
                                 :class="{
                                     'bg-blue-500/20 text-blue-300':   getPositionGroup(player.position) === 'FWD',
                                     'bg-violet-500/20 text-violet-300':  getPositionGroup(player.position) === 'DEF',
-                                    'bg-slate-500/20 text-slate-400':  getPositionGroup(player.position) === 'G',
+                                    'bg-emerald-500/20 text-emerald-300': getPositionGroup(player.position) === 'G',
                                 }"
                             >{{ player.position }}{{ player.position2 ? ` / ${player.position2}` : '' }}</span>
                         </template>
