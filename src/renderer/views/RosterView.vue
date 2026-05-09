@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import PlayerModal from '@/components/roster/PlayerModal.vue';
+import AllPlayersTable from "@/components/roster/AllPlayersTable.vue";
 import { Player } from '@/types';
 
 const showModal = ref(false);
@@ -32,7 +33,7 @@ function onClose() {
             >+ Add Player</button>
         </div>
 
-        <!-- AllPlayersTable will go here -->
+        <AllPlayersTable />
 
         <PlayerModal
             v-if="showModal"
