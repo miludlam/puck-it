@@ -3,6 +3,9 @@ import { onMounted } from 'vue';
 import AppHeader from '@/components/AppHeader.vue';
 import AppSidebar from '@/components/AppSidebar.vue';
 
+import { useTeamTheme } from '@/composables/useTeamTheme';
+useTeamTheme();
+
 import { usePlayerStore, useFranchiseStore } from "@/stores";
 
 const playerStore = usePlayerStore();
