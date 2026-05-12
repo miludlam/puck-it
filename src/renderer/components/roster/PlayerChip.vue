@@ -6,10 +6,17 @@ const props = defineProps<{
     fromSlot: string | null;
 }>();
 
+function getPositionGroup(position: string): string {
+    if (['C', 'LW', 'RW'].includes(position)) return 'FWD';
+    if (['LD', 'RD'].includes(position)) return 'DEF';
+    return 'G';
+}
+
 function onDragStart(event: DragEvent) {
     event.dataTransfer?.setData('text/plain', JSON.stringify({
-        playerId: props.player.id,
+        playerID: props.player.id,
         fromSlot: props.fromSlot,
+        positionGroup: getPositionGroup(props.player.position),
     }));
 }
 </script>
@@ -18,7 +25,8 @@ function onDragStart(event: DragEvent) {
     <div
         draggable="true"
         @dragstart="onDragStart"
-        class="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg cursor-grab active:cursor-grabbing select-none"
+        class="flex items-center gap-2 px-3 py-2 bg-slate-800 border rounded-lg cursor-grab active:cursor-grabbing select-none"
+        :style="{ borderColor: 'var(--team-primary)' }"
     >
         <!-- Position badge -->
         <span
