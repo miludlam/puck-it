@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { Franchise, Player, Team } from "@/types";
+import { Franchise, LineLeague, Player, Team } from "@/types";
 
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
@@ -72,12 +72,29 @@ export const usePlayerStore = defineStore('players', () => {
         patchPlayer(result.player);
         if (result.occupant) patchPlayer(result.occupant);
     }
+    async function clearLines(league: LineLeague) {
+        const leaguePlayers = players.value.filter(p => p.line_league === league);
+
+        await Promise.all(
+            leaguePlayers.map(p => window.db['player:update'](p.id, {
+                line_slot: null,
+                line_league: null,
+            }))
+        );
+
+        // Patch local state
+        players.value = players.value.map(p =>
+            p.line_league === league
+                ? { ...p, line_slot: null, line_league: null }
+                : p
+        );
+    }
 
     return {
         players,
         nhl, ahl, its,
         contractCount, nhlCapHit, nhlRosterCount,
-        load, add, update, remove, assignSlot,
+        load, add, update, remove, assignSlot, clearLines,
     };
 });
 

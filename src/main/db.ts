@@ -121,11 +121,6 @@ function assignSlot(
 
     tx();
 
-    const player = db.prepare('SELECT * FROM players WHERE id = ?').get(playerID) as Record<string, unknown>;
-    const occupant = occupantID
-        ? db.prepare('SELECT * FROM players WHERE id = ?').get(occupantID) as Record<string, unknown>
-        : null;
-
     return {
         player: db.prepare('SELECT * FROM players WHERE id = ?').get(playerID),
         occupant: occupantID
