@@ -99,6 +99,41 @@ function deletePlayer(id: number) {
     return { success: true };
 }
 
+function assignSlot(
+    playerID: number,
+    toSlot: string | null,
+    toLeague: string | null,
+    occupantID: number | null,
+    occupantSlot: string | null,
+    occupantLeague: string | null,
+) {
+    const tx = db.transaction(() => {
+        db.prepare(`
+            UPDATE players SET line_slot = ?, line_league = ? WHERE id = ?
+        `).run(toSlot, toLeague, playerID);
+
+        if (occupantID !== null) {
+            db.prepare(`
+                UPDATE players SET line_slot = ?, line_league = ? WHERE id = ?
+            `).run(occupantSlot, occupantLeague, occupantID);
+        }
+    });
+
+    tx();
+
+    const player = db.prepare('SELECT * FROM players WHERE id = ?').get(playerID) as Record<string, unknown>;
+    const occupant = occupantID
+        ? db.prepare('SELECT * FROM players WHERE id = ?').get(occupantID) as Record<string, unknown>
+        : null;
+
+    return {
+        player: db.prepare('SELECT * FROM players WHERE id = ?').get(playerID),
+        occupant: occupantID
+            ? db.prepare('SELECT * FROM players WHERE id = ?').get(occupantID)
+            : null,
+    };
+}
+
 /**********************
  * Franchise Handlers *
  **********************/
@@ -123,6 +158,15 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'player:add': (_: null, player: Record<string, unknown>) => addPlayer(player),
     'player:update': (_: null, id: number, player: Record<string, unknown>) => updatePlayer(id, player),
     'player:delete': (_: null, id: number) => deletePlayer(id),
+    'player:assignSlot': (
+        _: null,
+        playerID: number,
+        toSlot: string | null,
+        toLeague: string | null,
+        occupantID: number | null,
+        occupantSlot: string | null,
+        occupantLeague: string | null,
+    ) => assignSlot(playerID, toSlot, toLeague, occupantID, occupantSlot, occupantLeague),
     'franchise:get': () => getFranchise(),
     'franchise:update': (_: null, teamID: string, season: number) => updateFranchise(teamID, season),
 }

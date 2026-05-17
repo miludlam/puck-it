@@ -6,6 +6,7 @@ const channels = [
     'player:add',
     'player:update',
     'player:delete',
+    'player:assignSlot',
     'franchise:get',
     'franchise:update',
     'teams:get',

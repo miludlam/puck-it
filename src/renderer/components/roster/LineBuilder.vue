@@ -28,30 +28,42 @@ const slotMap = computed(() => {
     return map;
 });
 
+const nhlSlottedCount = computed(() =>
+    props.league === 'NHL'
+        ? playerStore.players.filter(p => p.line_slot !== null && p.line_league === 'NHL').length
+        : null
+);
+
 async function handleDrop(playerID: number, fromSlot: string | null, toSlot: string | null) {
     const player = playerStore.players.find(p => p.id === playerID);
     if (!player) return;
 
-    // Who currently occupies the target slot?
     const occupant = toSlot ? slotMap.value[toSlot] ?? null : null;
 
-    // Assign player to target slot
-    await playerStore.update(playerID, {
-        line_slot: toSlot,
-        line_league: toSlot ? props.league : null,
-    });
-
-    // If there was an occupant, send them to where the dragged player came from
-    if (occupant) {
-        await playerStore.update(occupant.id, {
-            line_slot: fromSlot,
-            line_league: fromSlot ? props.league : null,
-        });
-    }
+    await playerStore.assignSlot(
+        playerID,
+        toSlot,
+        toSlot ? props.league : null,
+        occupant?.id ?? null,
+        fromSlot,
+        fromSlot ? props.league : null,
+    );
 }
 </script>
 
 <template>
+    <div
+        v-if="props.league === 'NHL' && nhlSlottedCount !== null"
+        class="flex items-center justify-between px-4 py-2 rounded-lg mb-4 text-xs font-medium"
+        :class="{
+                'bg-emerald-500/10 text-emerald-400': nhlSlottedCount <= 20,
+                'bg-amber-500/10 text-amber-400':     nhlSlottedCount > 20 && nhlSlottedCount < 23,
+                'bg-rose-500/10 text-rose-400':       nhlSlottedCount >= 23,
+            }"
+    >
+        <span>NHL Roster: {{ nhlSlottedCount }} / 23</span>
+        <span v-if="nhlSlottedCount >= 23">Roster full</span>
+    </div>
     <div class="flex gap-6 p-6">
 
         <!-- Left column — lines + scratches -->

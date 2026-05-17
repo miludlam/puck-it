@@ -2,11 +2,6 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { Franchise, Player, Team } from "@/types";
 
-// Reserved for future use when deriving effective league for unassigned players
-function isJuniorIneligible(player: Player): boolean {
-    return player.junior_league !== null && player.age < 21;
-}
-
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
 
@@ -56,12 +51,33 @@ export const usePlayerStore = defineStore('players', () => {
         await window.db['player:delete'](id)
         players.value = players.value.filter(player => player.id !== id);
     }
+    async function assignSlot(
+        playerID: number,
+        toSlot: string | null,
+        toLeague: string | null,
+        occupantID: number | null,
+        occupantSlot: string | null,
+        occupantLeague: string | null,
+    ) {
+        const result = await window.db['player:assignSlot'](
+            playerID, toSlot, toLeague,
+            occupantID, occupantSlot, occupantLeague,
+        ) as { player: Player; occupant: Player | null };
+
+        const patchPlayer = (updated: Player) => {
+            const index = players.value.findIndex(p => p.id === updated.id);
+            if (index !== -1) players.value[index] = updated;
+        };
+
+        patchPlayer(result.player);
+        if (result.occupant) patchPlayer(result.occupant);
+    }
 
     return {
         players,
         nhl, ahl, its,
         contractCount, nhlCapHit, nhlRosterCount,
-        load, add, update, remove,
+        load, add, update, remove, assignSlot,
     };
 });
 
