@@ -45,6 +45,11 @@ function onDragStart(event: DragEvent) {
             {{ props.player.first_name.charAt(0) }}. {{ props.player.last_name }}
         </span>
 
+        <!-- Player type -->
+        <span class="text-xs text-slate-500 flex-shrink-0">
+            {{ props.player.player_type }}
+        </span>
+
         <!-- Overall -->
         <span class="text-xs font-semibold text-slate-400 flex-shrink-0">
             {{ props.player.overall }}

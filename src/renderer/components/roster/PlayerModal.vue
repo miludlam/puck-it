@@ -117,6 +117,18 @@ const playerTypeOptions = computed(() => {
 async function save() {
     const payload = { ...form };
 
+    // ITS players can never be on lines
+    if (payload.roster_league === 'ITS') {
+        payload.line_slot = null;
+        payload.line_league = null;
+    }
+
+    // Also clear if roster_league no longer matches line_league
+    if (payload.line_league !== null && payload.line_league !== payload.roster_league) {
+        payload.line_slot = null;
+        payload.line_league = null;
+    }
+
     if (props.player) {
         const updated = await playerStore.update(props.player.id, payload);
         emit('saved', updated);

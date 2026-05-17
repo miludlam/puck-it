@@ -6,9 +6,8 @@ import { League, Player, PlayerStatus, Position } from "@/types";
 const playerStore = usePlayerStore();
 
 type SortableColumn = 'name' | 'position' | 'overall' | 'potential_level' |
-    'potential_chance' | 'player_type' | 'age' | 'aav' | 'years_remaining' |
-    'roster_league' | 'status' | 'role' | 'contract_type' | 'clause' |
-    'waiver_eligible' | 'line_slot';
+    'player_type' | 'age' | 'aav' | 'years_remaining' | 'roster_league' |
+    'status' | 'role' | 'contract_type' | 'clause' | 'waiver_eligible' | 'line_slot';
 
 interface Column {
     key: SortableColumn | 'notes';
