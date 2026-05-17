@@ -4,6 +4,7 @@ import { LineLeague, Player } from "@/types";
 import { usePlayerStore } from '@/stores';
 import LineBuilderLines from './LineBuilderLines.vue';
 import LineBuilderPool from './LineBuilderPool.vue';
+import LineBuilderScratches from "./LineBuilderScratches.vue";
 
 const playerStore = usePlayerStore();
 
@@ -61,7 +62,12 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
                 @drop="(playerID, fromSlot, toSlot) => handleDrop(playerID, fromSlot, toSlot)"
             />
 
-            <!-- Scratches — NHL only, coming next -->
+            <LineBuilderScratches
+                v-if="league === 'NHL'"
+                :slotMap="slotMap"
+                :league="league"
+                @drop="(playerID, fromSlot, toSlot) => handleDrop(playerID, fromSlot, toSlot)"
+            />
         </div>
 
         <!-- Right column — pool -->
