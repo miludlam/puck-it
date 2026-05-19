@@ -66,7 +66,6 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
             }"
             >
                 <span>NHL Roster: {{ nhlSlottedCount }} / 23</span>
-                <span v-if="nhlSlottedCount >= 23">Roster full</span>
             </div>
             <div v-else />
 

@@ -29,7 +29,10 @@ const defencePairs = computed(() => [
     { label: 'Pair 3', slots: [`${props.league}-D3-LD`, `${props.league}-D3-RD`] },
 ]);
 
-const goalies = computed(() => [`${props.league}-G1`, `${props.league}-G2`]);
+const goalieSlots = computed(() => [
+    { label: 'Starter', slots: [`${props.league}-G1`] },
+    { label: 'Backup', slots: [`${props.league}-G2`] },
+]);
 </script>
 
 <template>
@@ -80,16 +83,19 @@ const goalies = computed(() => [`${props.league}-G1`, `${props.league}-G2`]);
         <!-- Goalies -->
         <div>
             <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Goalies</h3>
-            <div class="flex gap-2">
-                <LineBuilderSlot
-                    v-for="slotKey in goalies"
-                    :key="slotKey"
-                    :slotKey="slotKey"
-                    :player="slotMap[slotKey] ?? null"
-                    :league="league"
-                    class="flex-1"
-                    @drop="(playerID, fromSlot) => emit('drop', playerID, fromSlot, slotKey)"
-                />
+            <div class="space-y-2">
+                <div v-for="slot in goalieSlots" :key="slot.label" class="flex items-center gap-2">
+                    <span class="text-xs text-slate-600 w-12 flex-shrink-0">{{ slot.label }}</span>
+                    <LineBuilderSlot
+                        v-for="slotKey in slot.slots"
+                        :key="slotKey"
+                        :slotKey="slotKey"
+                        :player="slotMap[slotKey] ?? null"
+                        :league="league"
+                        class="flex-1"
+                        @drop="(playerID, fromSlot) => emit('drop', playerID, fromSlot, slotKey)"
+                    />
+                </div>
             </div>
         </div>
 

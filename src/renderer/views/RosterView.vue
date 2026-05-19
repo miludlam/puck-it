@@ -80,10 +80,10 @@ const itsByGroup = computed(() => {
 
             <template v-else>
                 <div v-for="group in [
-            { label: 'Forwards', players: itsByGroup.fwd },
-            { label: 'Defence',  players: itsByGroup.def },
-            { label: 'Goalies',  players: itsByGroup.g   },
-        ]" :key="group.label">
+                        { label: 'Forwards', players: itsByGroup.fwd },
+                        { label: 'Defence',  players: itsByGroup.def },
+                        { label: 'Goalies',  players: itsByGroup.g   },
+                    ]" :key="group.label">
                     <template v-if="group.players.length">
                         <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
                             {{ group.label }}

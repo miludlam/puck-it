@@ -54,7 +54,6 @@ const goaliePotentialRank: Record<string, number> = {
     'Franchise': 0, 'Elite': 1, 'Starter': 2, 'Fringe': 3, 'Backup': 4,
     'AHL Starter': 5, 'AHL Fringe': 6, 'AHL Backup': 7, 'AHL Extra': 8, 'AHL Other': 9,
 };
-
 const potentialChanceRank: Record<string, number> = {
     'High': 0, 'Med': 1, 'Low': 2, 'Exact': 3
 };
@@ -86,6 +85,7 @@ function getPotentialRank(player: Player): number {
 
 const positionGroupRank: Record<string, number> = { 'FWD': 0, 'DEF': 1, 'G': 2 };
 const positionRank: Record<string, number> = { 'C': 0, 'LW': 1, 'RW': 2, 'LD': 3, 'RD': 4, 'G': 5 };
+const leagueRank: Record<string, number> = { 'NHL': 0, 'AHL': 1, 'ITS': 2 };
 
 function defaultSort(a: Player, b: Player): number {
     // 1. Position group
@@ -101,16 +101,20 @@ function defaultSort(a: Player, b: Player): number {
     const ovrDiff = b.overall - a.overall;
     if (ovrDiff !== 0) return ovrDiff;
 
-    // 4. Potential level
+    // 4. League
+    const leagueDiff = leagueRank[a.roster_league] - leagueRank[b.roster_league];
+    if (leagueDiff !== 0) return leagueDiff;
+
+    // 5. Potential level
     const potDiff = getPotentialRank(a) - getPotentialRank(b);
     if (potDiff !== 0) return potDiff;
 
-    // 5. Potential chance
+    // 6. Potential chance
     const chanceDiff = potentialChanceRank[a.potential_chance] -
         potentialChanceRank[b.potential_chance];
     if (chanceDiff !== 0) return chanceDiff;
 
-    // 6. Age ascending
+    // 7. Age ascending
     return a.age - b.age;
 }
 
@@ -299,7 +303,7 @@ const filteredAndSorted = computed(() => {
                     @click="col.sortable ? handleColumnClick(col.key as SortableColumn, $event) : null"
                     class="px-3 py-2 text-left text-xs font-medium text-slate-400 whitespace-nowrap"
                     :class="[
-                        col.key === 'name' ? 'text-left' : 'text-center',
+                        ['name', 'notes'].includes(col.key) ? 'text-left' : 'text-center',
                         col.sortable ? 'cursor-pointer hover:text-slate-200' : ''
                     ]"
                 >
@@ -335,7 +339,7 @@ const filteredAndSorted = computed(() => {
                         v-for="col in columns.filter(c => c.visible.value)"
                         :key="col.key"
                         class="px-3 py-2 whitespace-nowrap"
-                        :class="col.key === 'name' ? 'text-left' : 'text-center'"
+                        :class="['name', 'notes'].includes(col.key) ? 'text-left' : 'text-center'"
                     >
                         <template v-if="col.key === 'roster_league'">
                             <span
