@@ -20,7 +20,7 @@ function createSchema() {
             last_name         TEXT    NOT NULL DEFAULT '',
             position          TEXT    NOT NULL,
             position2         TEXT    DEFAULT NULL,
-            age               INTEGER NOT NULL DEFAULT 25,
+            age               INTEGER NOT NULL DEFAULT 18,
             roster_league     TEXT    NOT NULL DEFAULT 'NHL',
             junior_league     TEXT    DEFAULT NULL,
             overall           INTEGER NOT NULL DEFAULT 70,
@@ -49,7 +49,41 @@ function createSchema() {
 
         INSERT OR IGNORE INTO franchise (id, team_id, season)
         VALUES (1, NULL, 25);
-    `)
+               
+        CREATE TABLE IF NOT EXISTS picks (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            year            INTEGER NOT NULL,
+            round           INTEGER NOT NULL,
+            original_owner  TEXT    NOT NULL, -- references teams.json
+            current_owner   TEXT    NOT NULL,  -- references teams.json, changes on trade
+            notes           TEXT    DEFAULT NULL,
+            UNIQUE(year, round, original_owner)
+       );
+
+        CREATE TABLE IF NOT EXISTS scouts (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT    NOT NULL,
+            overall_rating  TEXT    DEFAULT NULL,
+            region_ratings  TEXT    DEFAULT NULL  -- JSON blob
+        );
+
+        CREATE TABLE IF NOT EXISTS scouted_players (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            first_name          TEXT    NOT NULL DEFAULT '',
+            last_name           TEXT    NOT NULL DEFAULT '',
+            position            TEXT    NOT NULL,
+            position2           TEXT    DEFAULT NULL,
+            age                 INTEGER NOT NULL DEFAULT 18,
+            junior_league       TEXT    DEFAULT NULL,
+            overall             INTEGER NOT NULL DEFAULT 70,
+            potential_level     TEXT    NOT NULL DEFAULT '',
+            potential_chance    TEXT    NOT NULL DEFAULT 'Med',
+            player_type         TEXT    NOT NULL DEFAULT '',
+            nhl_readiness       TEXT    DEFAULT NULL,
+            scout_id            INTEGER DEFAULT NULL REFERENCES scouts(id) ON DELETE SET NULL,
+            notes               TEXT    DEFAULT NULL
+        );
+    `);
 }
 
 /*******************
@@ -144,6 +178,11 @@ function updateFranchise(teamID: string, season: number) {
 
     return getFranchise();
 }
+
+/************************
+ * Draft/Scout Handlers *
+ ************************/
+
 
 /************************
  * Exported Handler Map *
