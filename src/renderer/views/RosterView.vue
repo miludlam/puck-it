@@ -95,26 +95,26 @@ const itsByGroup = computed(() => {
                                 class="flex items-center gap-3 px-4 py-3 bg-slate-800/40 border border-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-800/70 transition-colors"
                                 @click="openEdit(player)"
                             >
-                        <span
-                            class="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0"
-                            :class="{
-                                'bg-sky-500/20 text-sky-300':         ['C', 'LW', 'RW'].includes(player.position),
-                                'bg-amber-500/20 text-amber-300':     ['LD', 'RD'].includes(player.position),
-                                'bg-emerald-500/20 text-emerald-300': player.position === 'G',
-                            }"
-                        >
-                            {{ player.position }}{{ player.position2 ? `/${player.position2}` : '' }}
-                        </span>
+                                <span
+                                    class="px-2 py-0.5 rounded text-xs font-medium flex-shrink-0"
+                                    :class="{
+                                        'bg-sky-500/20 text-sky-300':         ['C', 'LW', 'RW'].includes(player.position),
+                                        'bg-amber-500/20 text-amber-300':     ['LD', 'RD'].includes(player.position),
+                                        'bg-emerald-500/20 text-emerald-300': player.position === 'G',
+                                    }"
+                                >
+                                    {{ player.position }}{{ player.position2 ? `/${player.position2}` : '' }}
+                                </span>
                                 <span class="text-sm font-medium flex-1">
-                            {{ player.first_name.charAt(0) }}. {{ player.last_name }}
-                        </span>
+                                    {{ player.first_name.charAt(0) }}. {{ player.last_name }}
+                                </span>
                                 <span class="text-xs text-slate-500">Age {{ player.age }}</span>
                                 <span class="text-xs text-slate-400">
-                            {{ player.potential_level }} ({{ player.potential_chance }})
-                        </span>
+                                    {{ player.potential_level }} ({{ player.potential_chance }})
+                                </span>
                                 <span v-if="player.junior_league" class="text-xs text-slate-500">
-                            {{ player.junior_league }}
-                        </span>
+                                    {{ player.junior_league }}
+                                </span>
                                 <span class="text-xs font-semibold text-slate-400">{{ player.overall }}</span>
                             </div>
                         </div>
