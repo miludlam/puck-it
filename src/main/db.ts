@@ -180,9 +180,44 @@ function updateFranchise(teamID: string, season: number) {
 }
 
 /************************
- * Draft/Scout Handlers *
+ * Draft Pick Handlers *
  ************************/
+function getAllPicks() {
+    return db.prepare(`
+        SELECT * FROM picks
+        ORDER BY year ASC, round ASC
+    `).all();
+}
 
+function getMyPicks(teamID: string) {
+    return db.prepare(`
+        SELECT * FROM picks WHERE current_owner = ?
+    `).run(teamID);
+}
+
+function getTradedAway(teamID: string) {
+    return db.prepare(`
+        SELECT * FROM picks WHERE original_owner = ? AND current_owner != ?
+    `).run(teamID, teamID);
+}
+
+function getAcquired(teamID: string) {
+    return db.prepare(`
+        SELECT * FROM picks WHERE original_owner != ? AND current_owner = ?
+    `).run(teamID, teamID);
+}
+
+function addPick() {
+
+}
+
+function updatePick() {
+
+}
+
+function deletePick() {
+
+}
 
 /************************
  * Exported Handler Map *
