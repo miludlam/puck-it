@@ -12,6 +12,38 @@ export function initDB() {
     createSchema();
 }
 
+// Helper method that adds the next year's default draft picks on season advance
+function generatePicksForYear(year: number, teamID: string) {
+    const existing = db.prepare(
+        'SELECT id FROM picks WHERE year = ? AND original_owner = ?'
+    ).all(year, teamID);
+
+    if (existing.length > 0) return; // idempotent — already generated
+
+    const insert = db.prepare(`
+        INSERT OR IGNORE INTO picks (year, round, original_owner, current_owner)
+        VALUES (?, ?, ?, ?)
+    `);
+
+    const tx = db.transaction(() => {
+        for (let round = 1; round <= 7; round++) {
+            insert.run(year, round, teamID, teamID);
+        }
+    });
+
+    tx();
+}
+
+// Helper method for scout region handling
+function mapScout(row: Record<string, unknown>) {
+    return {
+        ...row,
+        region_ratings: row.region_ratings
+            ? JSON.parse(row.region_ratings as string)
+            : {},
+    };
+}
+
 function createSchema() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS players (
@@ -21,7 +53,7 @@ function createSchema() {
             position          TEXT    NOT NULL,
             position2         TEXT    DEFAULT NULL,
             age               INTEGER NOT NULL DEFAULT 18,
-            roster_league     TEXT    NOT NULL DEFAULT 'NHL',
+            roster_league     TEXT    NOT NULL DEFAULT NULL,
             junior_league     TEXT    DEFAULT NULL,
             overall           INTEGER NOT NULL DEFAULT 70,
             potential_level   TEXT    NOT NULL DEFAULT '',
@@ -62,7 +94,8 @@ function createSchema() {
 
         CREATE TABLE IF NOT EXISTS scouts (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            name            TEXT    NOT NULL,
+            first_name      TEXT    NOT NULL,
+            last_name       TEXT    NOT NULL,
             overall_rating  TEXT    DEFAULT NULL,
             region_ratings  TEXT    DEFAULT NULL  -- JSON blob
         );
@@ -172,16 +205,34 @@ function getFranchise() {
 }
 
 function updateFranchise(teamID: string, season: number) {
-    db.prepare(`
-        UPDATE franchise SET team_id = ?, season = ? WHERE id = 1
-    `).run(teamID, season);
+    db.prepare(`UPDATE franchise SET team_id = ?, season = ? WHERE id = 1`)
+        .run(teamID, season);
+
+    // Generate 6 years of picks if team is being set
+    for (let i = 1; i <= 6; i++) {
+        generatePicksForYear(season + i, teamID);
+    }
 
     return getFranchise();
 }
 
-/************************
+function advanceSeason() {
+    const franchise = getFranchise() as any;
+    const newSeason = franchise.season + 1;
+    const newPickYear = newSeason + 6;
+
+    db.prepare('UPDATE franchise SET season = ? WHERE id = 1')
+        .run(newSeason);
+
+    // Generate picks for the newly available year
+    generatePicksForYear(newPickYear, franchise.team_id);
+
+    return getFranchise();
+}
+
+/***********************
  * Draft Pick Handlers *
- ************************/
+ ***********************/
 function getAllPicks() {
     return db.prepare(`
         SELECT * FROM picks
@@ -244,6 +295,65 @@ function deletePick(id: number) {
     return { success: true };
 }
 
+/******************
+ * Scout Handlers *
+ ******************/
+function getAllScouts() {
+    const rows = db.prepare(`
+        SELECT * FROM scouts
+        ORDER BY last_name ASC, first_name ASC
+    `).all() as Record<string, unknown>[];
+
+    return rows.map(mapScout);
+}
+
+function addScout(scout: Record<string, unknown>) {
+    const result = db.prepare(`
+        INSERT INTO scouts (
+            first_name, last_name, overall_rating, region_ratings
+        ) VALUES (
+            @first_name, @last_name, @overall_rating, @region_ratings
+        )
+    `).run({
+        ...scout,
+        region_ratings: JSON.stringify(scout.region_ratings ?? {}),
+    });
+
+    if (!result.lastInsertRowid) return null;
+
+    const row = db.prepare('SELECT * FROM scouts WHERE id = ?')
+        .get(result.lastInsertRowid) as Record<string, unknown>;
+
+    return mapScout(row);
+}
+
+function updateScout(id: number, scout: Record<string, unknown>) {
+    const data = {
+        ...scout,
+        ...(scout.region_ratings !== undefined && {
+            region_ratings: JSON.stringify(scout.region_ratings),
+        }),
+    };
+
+    const fields = Object.keys(data)
+        .map(key => `${key} = @${key}`)
+        .join(', ');
+
+    db.prepare(`UPDATE scouts SET ${fields} WHERE id = @id`)
+        .run({ ...data, id });
+
+    const row = db.prepare('SELECT * FROM scouts WHERE id = ?')
+        .get(id) as Record<string, unknown>;
+
+    return mapScout(row);
+}
+
+function deleteScout(id: number) {
+    db.prepare('DELETE FROM scouts WHERE id = ?').run(id);
+
+    return { success: true };
+}
+
 /************************
  * Exported Handler Map *
  ************************/
@@ -263,4 +373,16 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     ) => assignSlot(playerID, toSlot, toLeague, occupantID, occupantSlot, occupantLeague),
     'franchise:get': () => getFranchise(),
     'franchise:update': (_: null, teamID: string, season: number) => updateFranchise(teamID, season),
+    'franchise:advanceSeason': () => advanceSeason(),
+    'pick:getAll': () => getAllPicks(),
+    'pick:getMy': (_: null, teamID: string) => getMyPicks(teamID),
+    'pick:getTraded': (_: null, teamID: string) => getTradedAway(teamID),
+    'pick:getAcquired': (_: null, teamID: string) => getAcquired(teamID),
+    'pick:add': (_: null, pick: Record<string, unknown>) => addPick(pick),
+    'pick:update': (_: null, id: number, pick: Record<string, unknown>) => updatePick(id, pick),
+    'pick:delete': (_: null, id: number) => deletePick(id),
+    'scout:getAll': () => getAllScouts(),
+    'scout:add': (_: null, scout: Record<string, unknown>) => addScout(scout),
+    'scout:update': (_: null, id: number, scout: Record<string, unknown>) => updateScout(id, scout),
+    'scout:delete': (_: null, id: number) => deleteScout(id),
 }
