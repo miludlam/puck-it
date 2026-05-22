@@ -55,10 +55,10 @@ function createSchema() {
             year            INTEGER NOT NULL,
             round           INTEGER NOT NULL,
             original_owner  TEXT    NOT NULL, -- references teams.json
-            current_owner   TEXT    NOT NULL,  -- references teams.json, changes on trade
+            current_owner   TEXT    NOT NULL, -- references teams.json, changes on trade
             notes           TEXT    DEFAULT NULL,
             UNIQUE(year, round, original_owner)
-       );
+        );
 
         CREATE TABLE IF NOT EXISTS scouts (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -192,31 +192,56 @@ function getAllPicks() {
 function getMyPicks(teamID: string) {
     return db.prepare(`
         SELECT * FROM picks WHERE current_owner = ?
-    `).run(teamID);
+        ORDER BY year ASC, round ASC
+    `).all(teamID);
 }
 
 function getTradedAway(teamID: string) {
     return db.prepare(`
         SELECT * FROM picks WHERE original_owner = ? AND current_owner != ?
-    `).run(teamID, teamID);
+        ORDER BY year ASC, round ASC
+    `).all(teamID, teamID);
 }
 
 function getAcquired(teamID: string) {
     return db.prepare(`
         SELECT * FROM picks WHERE original_owner != ? AND current_owner = ?
-    `).run(teamID, teamID);
+        ORDER BY year ASC, round ASC
+    `).all(teamID, teamID);
 }
 
-function addPick() {
+function addPick(pick: Record<string, unknown>) {
+    const result = db.prepare(`
+        INSERT OR IGNORE INTO picks (
+            year, round, original_owner, current_owner, notes
+        ) VALUES (
+            @year, @round, @original_owner, @current_owner, @notes 
+        )
+    `).run(pick);
 
+    // If lastInsertRowid is 0, the insert was ignored (duplicate)
+    if (!result.lastInsertRowid) return null;
+
+    return db.prepare('SELECT * FROM picks WHERE id = ?')
+        .get(result.lastInsertRowid) as Record<string, unknown>;
 }
 
-function updatePick() {
+function updatePick(id: number, pick: Record<string, unknown>) {
+    const fields = Object.keys(pick)
+        .map(key => `${key} = @${key}`)
+        .join(', ');
 
+    db.prepare(`UPDATE picks SET ${fields} WHERE id = @id`)
+        .run({ ...pick, id });
+
+    return db.prepare('SELECT * FROM picks WHERE id = ?')
+        .get(id) as Record<string, unknown>;
 }
 
-function deletePick() {
+function deletePick(id: number) {
+    db.prepare('DELETE FROM picks WHERE id = ?').run(id);
 
+    return { success: true };
 }
 
 /************************
