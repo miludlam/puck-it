@@ -354,6 +354,51 @@ function deleteScout(id: number) {
     return { success: true };
 }
 
+/****************************
+ * Scouted Players Handlers *
+ ****************************/
+function getAllScoutedPlayers() {
+    return db.prepare(`
+        SELECT * FROM scouted_players
+        ORDER BY last_name ASC, first_name ASC
+    `).all() as Record<string, unknown>[];
+}
+
+function addScoutedPlayer(player: Record<string, unknown>) {
+    const result = db.prepare(`
+        INSERT INTO scouted_players (
+            first_name, last_name, position, position2, age, junior_league,
+            overall, potential_level, potential_chance, player_type, 
+            nhl_readiness, scout_id, notes
+        ) VALUES (
+            @first_name, @last_name, @position, @position2, @age, @junior_league,
+            @overall, @potential_level, @potential_chance, @player_type,
+            @nhl_readiness, @scout_id, @notes
+        )
+    `).run(player);
+
+    return db.prepare('SELECT * FROM scouted_players WHERE id = ?')
+        .get(result.lastInsertRowid) as Record<string, unknown>;
+}
+
+function updateScoutedPlayer(id: number, player: Record<string, unknown>) {
+    const fields = Object.keys(player)
+        .map(key => `${key} = @${key}`)
+        .join(', ');
+
+    db.prepare(`UPDATE scouted_players SET ${fields} WHERE id = @id`)
+        .run({ ...player, id });
+
+    return db.prepare('SELECT * FROM scouted_players WHERE id = ?')
+        .get(id) as Record<string, unknown>;
+}
+
+function deleteScoutedPlayer(id: number) {
+    db.prepare('DELETE FROM scouted_players WHERE id = ?').run(id);
+
+    return { success: true };
+}
+
 /************************
  * Exported Handler Map *
  ************************/
@@ -385,4 +430,8 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'scout:add': (_: null, scout: Record<string, unknown>) => addScout(scout),
     'scout:update': (_: null, id: number, scout: Record<string, unknown>) => updateScout(id, scout),
     'scout:delete': (_: null, id: number) => deleteScout(id),
+    'scoutedPlayer:getAll': () => getAllScoutedPlayers(),
+    'scoutedPlayer:add': (_: null, player: Record<string, unknown>) => addScoutedPlayer(player),
+    'scoutedPlayer:update': (_: null, id: number, player: Record<string, unknown>) => updateScoutedPlayer(id, player),
+    'scoutedPlayer:delete': (_: null, id: number) => deleteScoutedPlayer(id),
 }
