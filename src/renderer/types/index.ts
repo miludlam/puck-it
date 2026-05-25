@@ -3,19 +3,19 @@ export type Position = 'C' | 'LW' | 'RW' | 'LD' | 'RD' | 'G';
 
 // League Types
 export type League = 'NHL' | 'AHL' | 'ITS';
-export type JuniorLeague = 'OHL' | 'QMJHL' | 'WHL' |                // Canada
-                           'US Central' | 'US East' | 'US West' |   // USA
-                           'Allsvenskan' | 'Liiga' | 'SHL' |        // Scandinavia
-                           'DEL' | 'Extraliga' | 'ICE' | 'NLA' |    // Central Europe
-                           'Russia' | 'ROW';                        // Asia
+export type JuniorLeague = 'OHL' | 'QMJHL' | 'WHL' | // Canada
+    'US Central' | 'US East' | 'US West' |           // USA
+    'Allsvenskan' | 'Liiga' | 'SHL' |                // Scandinavia
+    'DEL' | 'Extraliga' | 'ICE' | 'NLA' |            // Central Europe
+    'Russia' | 'ROW';                                // Asia
 
 // Player Potential Types
 export type ForwardPotentialLevel = 'Top 6' | 'Top 9' | 'Bottom 6'|
-                                    'AHL Top 6' | 'AHL Bottom 6' | 'AHL 4th Line' | 'AHL Extra' | 'AHL Other';
+    'AHL Top 6' | 'AHL Bottom 6' | 'AHL 4th Line' | 'AHL Extra' | 'AHL Other';
 export type DefensePotentialLevel = 'Top 4' | 'Top 6' | '7th' |
-                                    'AHL Top 2' | 'AHL Top 4' | 'AHL Top 6' | 'AHL 7th' | 'AHL Other';
+    'AHL Top 2' | 'AHL Top 4' | 'AHL Top 6' | 'AHL 7th' | 'AHL Other';
 export type GoaliePotentialLevel = 'Starter' | 'Fringe' | 'Backup' |
-                                   'AHL Starter' | 'AHL Fringe' | 'AHL Backup' | 'AHL Extra' | 'AHL Other';
+    'AHL Starter' | 'AHL Fringe' | 'AHL Backup' | 'AHL Extra' | 'AHL Other';
 export type PotentialLevel = 'Franchise' | 'Elite' | ForwardPotentialLevel | DefensePotentialLevel | GoaliePotentialLevel;
 export type PotentialChance = 'Exact' | 'High' | 'Med' | 'Low';
 

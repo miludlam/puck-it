@@ -186,18 +186,37 @@ const filteredAndSorted = computed(() => {
         for (const field of sortFields.value) {
             let av: unknown;
             let bv: unknown;
+            const dir = field.direction === 'asc' ? 1 : -1;
 
             // Handle composite fields
             if (field.key === 'name') {
                 av = `${a.last_name} ${a.first_name}`;
                 bv = `${b.last_name} ${b.first_name}`;
+            } else if (field.key === 'roster_league') {
+                const leagueDiff = leagueRank[a.roster_league] - leagueRank[b.roster_league];
+                if (leagueDiff !== 0) return leagueDiff * -dir;
+
+                // Tiebreak
+                av = leagueRank[a.roster_league];
+                bv = leagueRank[b.roster_league];
+            } else if (field.key === 'potential_level') {
+                const groupA = getPositionGroup(a.position);
+                const groupB = getPositionGroup(b.position);
+                const groupDiff = positionGroupRank[groupA] - positionGroupRank[groupB];
+                if (groupDiff !== 0) return groupDiff * dir;
+
+                const levelDiff = getPotentialRank(a) - getPotentialRank(b);
+                if (levelDiff !== 0) return levelDiff * dir;
+
+                // Tiebreak by chance
+                av = potentialChanceRank[a.potential_chance];
+                bv = potentialChanceRank[b.potential_chance];
             } else {
                 av = a[field.key as keyof Player];
                 bv = b[field.key as keyof Player];
             }
 
             if (av === bv) continue;
-            const dir = field.direction === 'asc' ? 1 : -1;
             if (typeof av === 'number' && typeof bv === 'number') {
                 return (av - bv) * dir;
             }
