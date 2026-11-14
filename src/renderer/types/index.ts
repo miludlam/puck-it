@@ -36,6 +36,21 @@ export type PlayerStatus = 'Active' | 'Injured' | 'Healthy Scratch';
 // Line Types
 export type LineLeague = Exclude<League, 'ITS'>;
 
+// Scout rating scale
+export type ScoutRating =
+    'A+' | 'A' | 'A-' |
+    'B+' | 'B' | 'B-' |
+    'C+' | 'C' | 'C-' |
+    'D+' | 'D' | 'D-' | 'E';
+
+// NHL readiness
+export type NHLReadiness =
+    'NHL Ready' | '1 Year' | '2 Years' |
+    '3 Years'   | '4 Years' | '5 Years';
+
+// Draft round
+export type DraftRound = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
 export interface Player {
     id: number;
     first_name: string;
@@ -49,6 +64,7 @@ export interface Player {
     potential_level: PotentialLevel;
     potential_chance: PotentialChance;
     player_type: PlayerType;
+    role: string;
     aav: number;
     years_remaining: number;
     contract_type: ContractType | null;
@@ -58,7 +74,6 @@ export interface Player {
     notes: string | null;
     line_slot: string | null;
     line_league: LineLeague | null;
-    role: string;
     created_at: string;
 }
 
@@ -81,6 +96,44 @@ export interface Franchise {
     team_id: string | null;
     season: number;
     created_at: string;
+}
+
+// Pick
+export interface Pick {
+    id: number;
+    year: number;
+    round: DraftRound;
+    original_owner: string;  // team ID
+    current_owner: string;   // team ID
+    notes: string | null;
+}
+
+// Scout
+export interface Scout {
+    id: number;
+    first_name: string;
+    last_name: string;
+    overall_rating: ScoutRating | null;
+    region_ratings: Partial<Record<JuniorLeague, ScoutRating>>;
+    region: JuniorLeague | null;
+}
+
+// Scouted Player
+export interface ScoutedPlayer {
+    id: number;
+    first_name: string;
+    last_name: string;
+    position: Position;
+    position2: Position | null;
+    age: number;
+    junior_league: JuniorLeague | null;
+    overall: number;
+    potential_level: PotentialLevel;
+    potential_chance: PotentialChance;
+    player_type: PlayerType;
+    nhl_readiness: NHLReadiness | null;
+    scout_id: number | null;
+    notes: string | null;
 }
 
 declare global {

@@ -13,6 +13,16 @@ const playerStore = usePlayerStore();
 
 const showModal = ref(false);
 const selectedPlayer = ref<Player | undefined>(undefined);
+const confirmClear = ref(false);
+
+async function onClearRoster() {
+    if (!confirmClear.value) {
+        confirmClear.value = true;
+        return;
+    }
+    await playerStore.clearAll();
+    confirmClear.value = false;
+}
 
 function openAdd() {
     selectedPlayer.value = undefined;
@@ -55,11 +65,30 @@ const itsByGroup = computed(() => {
                     @click="activeTab = tab"
                 >{{ tab }}</button>
             </div>
-            <button
-                class="px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
-                :style="{ backgroundColor: 'var(--team-primary)' }"
-                @click="openAdd"
-            >+ Add Player</button>
+            <div class="flex items-center gap-2">
+                <template v-if="confirmClear">
+                    <span class="text-sm text-slate-400">Clear all players?</span>
+                    <button
+                        class="px-3 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
+                        @click="onClearRoster"
+                    >Confirm</button>
+                    <button
+                        class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                        @click="confirmClear = false"
+                    >Cancel</button>
+                </template>
+                <template v-else>
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                        @click="onClearRoster"
+                    >Clear Roster</button>
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
+                        :style="{ backgroundColor: 'var(--team-primary)' }"
+                        @click="openAdd"
+                    >+ Add Player</button>
+                </template>
+            </div>
         </div>
 
         <!-- Views -->

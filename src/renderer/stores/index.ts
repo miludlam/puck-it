@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { Franchise, LineLeague, Player, Team } from "@/types";
+import { Franchise, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team } from "@/types";
 
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
@@ -20,9 +20,14 @@ export const usePlayerStore = defineStore('players', () => {
     const contractCount = computed(() =>
         players.value.filter(player => player.aav > 0).length
     );
-    const nhlCapHit = computed(() =>
-        nhl.value.reduce((sum, player) => sum + player.aav, 0)
-    );
+    const AHL_CAP_EXEMPTION = 1.15;
+    const nhlCapHit = computed(() => {
+        const nhlHit = nhl.value.reduce((sum, p) => sum + p.aav, 0);
+        const ahlOverage = ahl.value
+            .filter(p => p.aav > AHL_CAP_EXEMPTION)
+            .reduce((sum, p) => sum + (p.aav - AHL_CAP_EXEMPTION), 0);
+        return nhlHit + ahlOverage;
+    });
     const nhlRosterCount = computed(() =>
         nhl.value.filter(player => player.status !== 'Injured').length
     );
@@ -135,4 +140,92 @@ export const useFranchiseStore = defineStore('franchise', () => {
         currentTeam, formattedSeason,
         load, loadTeams, update,
     };
+});
+
+export const usePickStore = defineStore('picks', () => {
+    const picks = ref<Pick[]>([]);
+
+    const owned = computed(() => picks.value.filter(p => p.current_owner === _teamID()));
+    const tradedAway = computed(() => picks.value.filter(p =>
+        p.original_owner === _teamID() && p.current_owner !== _teamID()
+    ));
+
+    function _teamID() {
+        const fs = useFranchiseStore();
+        return fs.franchise?.team_id ?? '';
+    }
+
+    async function load() {
+        const result = await window.db['pick:getAll']();
+        picks.value = result as Pick[];
+    }
+    async function add(pick: Omit<Pick, 'id'>) {
+        const result = await window.db['pick:add'](pick);
+        if (result) picks.value = [...picks.value, result as Pick];
+        return result as Pick | null;
+    }
+    async function update(id: number, pick: Partial<Pick>) {
+        const result = await window.db['pick:update'](id, pick) as Pick;
+        const index = picks.value.findIndex(p => p.id === id);
+        if (index !== -1) picks.value[index] = result;
+        return result;
+    }
+    async function remove(id: number) {
+        await window.db['pick:delete'](id);
+        picks.value = picks.value.filter(p => p.id !== id);
+    }
+
+    return { picks, owned, tradedAway, load, add, update, remove };
+});
+
+export const useScoutStore = defineStore('scouts', () => {
+    const scouts = ref<Scout[]>([]);
+
+    async function load() {
+        const result = await window.db['scout:getAll']();
+        scouts.value = result as Scout[];
+    }
+    async function add(scout: Omit<Scout, 'id'>) {
+        const result = await window.db['scout:add'](scout) as Scout;
+        scouts.value = [...scouts.value, result];
+        return result;
+    }
+    async function update(id: number, scout: Partial<Scout>) {
+        const result = await window.db['scout:update'](id, scout) as Scout;
+        const index = scouts.value.findIndex(s => s.id === id);
+        if (index !== -1) scouts.value[index] = result;
+        return result;
+    }
+    async function remove(id: number) {
+        await window.db['scout:delete'](id);
+        scouts.value = scouts.value.filter(s => s.id !== id);
+    }
+
+    return { scouts, load, add, update, remove };
+});
+
+export const useScoutedPlayerStore = defineStore('scoutedPlayers', () => {
+    const scoutedPlayers = ref<ScoutedPlayer[]>([]);
+
+    async function load() {
+        const result = await window.db['scoutedPlayer:getAll']();
+        scoutedPlayers.value = result as ScoutedPlayer[];
+    }
+    async function add(player: Omit<ScoutedPlayer, 'id'>) {
+        const result = await window.db['scoutedPlayer:add'](player) as ScoutedPlayer;
+        scoutedPlayers.value = [...scoutedPlayers.value, result];
+        return result;
+    }
+    async function update(id: number, player: Partial<ScoutedPlayer>) {
+        const result = await window.db['scoutedPlayer:update'](id, player) as ScoutedPlayer;
+        const index = scoutedPlayers.value.findIndex(p => p.id === id);
+        if (index !== -1) scoutedPlayers.value[index] = result;
+        return result;
+    }
+    async function remove(id: number) {
+        await window.db['scoutedPlayer:delete'](id);
+        scoutedPlayers.value = scoutedPlayers.value.filter(p => p.id !== id);
+    }
+
+    return { scoutedPlayers, load, add, update, remove };
 });

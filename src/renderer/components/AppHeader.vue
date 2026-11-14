@@ -8,7 +8,7 @@ const franchiseStore = useFranchiseStore();
 const playerStore = usePlayerStore();
 
 // Constants
-const CAP_CEILING = 88;
+const CAP_CEILING = 95.5;
 const MAX_CONTRACTS = 50;
 const MAX_ROSTER = 23;
 
@@ -30,6 +30,12 @@ const nhlCapHit = computed(() =>
 const nhlRosterCount = computed(() =>
     playerStore.nhlRosterCount
 );
+const capSpace = computed(() =>
+    formatCap(CAP_CEILING - playerStore.nhlCapHit)
+);
+const capSpaceNegative = computed(() =>
+    playerStore.nhlCapHit > CAP_CEILING
+);
 
 const showModal = ref(false);
 </script>
@@ -46,6 +52,10 @@ const showModal = ref(false);
         >{{ teamName }} · {{ franchiseStore.formattedSeason }}</span>
         <span class="text-sm font-medium">Contracts: {{ contractCount }} / {{ MAX_CONTRACTS }}</span>
         <span class="text-sm font-medium">Cap: {{ nhlCapHit }} / {{ formatCap(CAP_CEILING) }}</span>
+        <span
+            class="text-sm font-medium"
+            :class="capSpaceNegative ? 'text-rose-400' : 'text-emerald-400'"
+        >Space: {{ capSpace }}</span>
         <span class="text-sm font-medium">NHL Players: {{ nhlRosterCount }} / {{ MAX_ROSTER }}</span>
     </header>
     <FranchiseModal v-if="showModal" @close="showModal = false" />

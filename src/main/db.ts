@@ -97,9 +97,25 @@ function createSchema() {
             first_name      TEXT    NOT NULL,
             last_name       TEXT    NOT NULL,
             overall_rating  TEXT    DEFAULT NULL,
-            region_ratings  TEXT    DEFAULT NULL  -- JSON blob
+            region_ratings  TEXT    DEFAULT NULL,  -- JSON blob
+            region          TEXT    DEFAULT NULL   -- currently assigned region
         );
 
+    `);
+
+    // Migrate scouts table to split name → first_name + last_name
+    const scoutCols = db.prepare("PRAGMA table_info(scouts)").all() as { name: string }[];
+    const scoutColNames = scoutCols.map(c => c.name);
+    if (!scoutColNames.includes('first_name'))
+        db.exec("ALTER TABLE scouts ADD COLUMN first_name TEXT NOT NULL DEFAULT ''");
+    if (!scoutColNames.includes('last_name'))
+        db.exec("ALTER TABLE scouts ADD COLUMN last_name TEXT NOT NULL DEFAULT ''");
+    if (scoutColNames.includes('name'))
+        db.exec("ALTER TABLE scouts DROP COLUMN name");
+    if (!scoutColNames.includes('region'))
+        db.exec("ALTER TABLE scouts ADD COLUMN region TEXT DEFAULT NULL");
+
+    db.exec(`
         CREATE TABLE IF NOT EXISTS scouted_players (
             id                  INTEGER PRIMARY KEY AUTOINCREMENT,
             first_name          TEXT    NOT NULL DEFAULT '',
@@ -316,13 +332,14 @@ function getAllScouts() {
 function addScout(scout: Record<string, unknown>) {
     const result = db.prepare(`
         INSERT INTO scouts (
-            first_name, last_name, overall_rating, region_ratings
+            first_name, last_name, overall_rating, region_ratings, region
         ) VALUES (
-            @first_name, @last_name, @overall_rating, @region_ratings
+            @first_name, @last_name, @overall_rating, @region_ratings, @region
         )
     `).run({
         ...scout,
         region_ratings: JSON.stringify(scout.region_ratings ?? {}),
+        region: scout.region ?? null,
     });
 
     if (!result.lastInsertRowid) return null;
