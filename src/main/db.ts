@@ -166,6 +166,12 @@ function deletePlayer(id: number) {
     return { success: true };
 }
 
+function clearAllPlayers() {
+    db.prepare('DELETE FROM players').run();
+
+    return { success: true };
+}
+
 function assignSlot(
     playerID: number,
     toSlot: string | null,
@@ -407,6 +413,7 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'player:add': (_: null, player: Record<string, unknown>) => addPlayer(player),
     'player:update': (_: null, id: number, player: Record<string, unknown>) => updatePlayer(id, player),
     'player:delete': (_: null, id: number) => deletePlayer(id),
+    'player:clearAll': () => clearAllPlayers(),
     'player:assignSlot': (
         _: null,
         playerID: number,

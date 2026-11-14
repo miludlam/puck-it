@@ -51,6 +51,10 @@ export const usePlayerStore = defineStore('players', () => {
         await window.db['player:delete'](id)
         players.value = players.value.filter(player => player.id !== id);
     }
+    async function clearAll() {
+        await window.db['player:clearAll']();
+        players.value = [];
+    }
     async function assignSlot(
         playerID: number,
         toSlot: string | null,
@@ -94,7 +98,7 @@ export const usePlayerStore = defineStore('players', () => {
         players,
         nhl, ahl, its,
         contractCount, nhlCapHit, nhlRosterCount,
-        load, add, update, remove, assignSlot, clearLines,
+        load, add, update, remove, assignSlot, clearLines, clearAll,
     };
 });
 
