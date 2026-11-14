@@ -14,10 +14,11 @@ const props = defineProps<{
 
 const confirmClear = ref(false);
 
+// Unslotted players, highest overall first
 const poolPlayers = computed(() =>
-    playerStore.players.filter(p =>
-        p.roster_league === props.league && p.line_slot === null
-    )
+    playerStore.players
+        .filter(p => p.roster_league === props.league && p.line_slot === null)
+        .sort((a, b) => b.overall - a.overall)
 );
 
 const slotMap = computed(() => {
