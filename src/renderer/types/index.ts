@@ -109,6 +109,8 @@ export interface Pick {
 }
 
 // Scout
+export type ScoutStatus = 'hired' | 'offered'; // offered = contract out, not on payroll yet
+
 export interface Scout {
     id: number;
     first_name: string;
@@ -116,6 +118,8 @@ export interface Scout {
     overall_rating: ScoutRating | null;
     region_ratings: Partial<Record<JuniorLeague, ScoutRating>>;
     region: JuniorLeague | null;
+    region_locked: boolean;
+    status: ScoutStatus;
 }
 
 // Scouted Player

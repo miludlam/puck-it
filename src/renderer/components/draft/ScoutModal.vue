@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
 import { useScoutStore } from '@/stores';
-import { JuniorLeague, Scout, ScoutRating } from '@/types';
+import { JuniorLeague, Scout, ScoutRating, ScoutStatus } from '@/types';
 
 const scoutStore = useScoutStore();
 
-const props = defineProps<{ scout?: Scout }>();
+// `status` sets the starting status for a new scout (ignored when editing)
+const props = defineProps<{ scout?: Scout; status?: ScoutStatus }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const inputClass = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500";
@@ -27,6 +28,8 @@ const form = reactive({
     last_name: props.scout?.last_name ?? '',
     overall_rating: props.scout?.overall_rating ?? null as ScoutRating | null,
     region: props.scout?.region ?? null as JuniorLeague | null,
+    region_locked: props.scout?.region_locked ?? false,
+    status: props.scout?.status ?? props.status ?? 'hired' as ScoutStatus,
     region_ratings: { ...(props.scout?.region_ratings ?? {}) } as Partial<Record<JuniorLeague, ScoutRating>>,
 });
 
@@ -56,7 +59,9 @@ async function remove() {
     <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
         <div class="bg-slate-900 rounded-xl w-[560px] max-h-[90vh] overflow-y-auto p-6 space-y-6">
             <div class="flex items-center justify-between">
-                <h2 class="text-base font-semibold">{{ props.scout ? 'Edit Scout' : 'Add Scout' }}</h2>
+                <h2 class="text-base font-semibold">
+                    {{ props.scout ? 'Edit Scout' : form.status === 'offered' ? 'Offer Contract' : 'Add Scout' }}
+                </h2>
                 <button class="text-slate-400 hover:text-slate-200 transition-colors" @click="emit('close')">✕</button>
             </div>
 
@@ -80,7 +85,16 @@ async function remove() {
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1">Assigned Region</label>
+                        <label class="block text-xs text-slate-400 mb-1">Status</label>
+                        <select v-model="form.status" :class="inputClass">
+                            <option value="hired">On payroll</option>
+                            <option value="offered">Contract offered</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">
+                            {{ form.status === 'offered' ? 'Target Region' : 'Assigned Region' }}
+                        </label>
                         <select v-model="form.region" :class="inputClass">
                             <option :value="null">— Unassigned —</option>
                             <option v-for="region in regions" :key="region" :value="region">{{ region }}</option>

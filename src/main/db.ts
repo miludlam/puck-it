@@ -41,6 +41,7 @@ function mapScout(row: Record<string, unknown>) {
         region_ratings: row.region_ratings
             ? JSON.parse(row.region_ratings as string)
             : {},
+        region_locked: Boolean(row.region_locked),
     };
 }
 
@@ -98,7 +99,9 @@ function createSchema() {
             last_name       TEXT    NOT NULL,
             overall_rating  TEXT    DEFAULT NULL,
             region_ratings  TEXT    DEFAULT NULL,  -- JSON blob
-            region          TEXT    DEFAULT NULL   -- currently assigned region
+            region          TEXT    DEFAULT NULL,  -- currently assigned region
+            region_locked   INTEGER NOT NULL DEFAULT 0,  -- 1 = skip during auto-assign
+            status          TEXT    NOT NULL DEFAULT 'hired'  -- 'hired' | 'offered' (region = target region; contracts aren't region-specific)
         );
 
     `);
@@ -114,6 +117,10 @@ function createSchema() {
         db.exec("ALTER TABLE scouts DROP COLUMN name");
     if (!scoutColNames.includes('region'))
         db.exec("ALTER TABLE scouts ADD COLUMN region TEXT DEFAULT NULL");
+    if (!scoutColNames.includes('region_locked'))
+        db.exec("ALTER TABLE scouts ADD COLUMN region_locked INTEGER NOT NULL DEFAULT 0");
+    if (!scoutColNames.includes('status'))
+        db.exec("ALTER TABLE scouts ADD COLUMN status TEXT NOT NULL DEFAULT 'hired'");
 
     db.exec(`
         CREATE TABLE IF NOT EXISTS scouted_players (
@@ -332,14 +339,16 @@ function getAllScouts() {
 function addScout(scout: Record<string, unknown>) {
     const result = db.prepare(`
         INSERT INTO scouts (
-            first_name, last_name, overall_rating, region_ratings, region
+            first_name, last_name, overall_rating, region_ratings, region, region_locked, status
         ) VALUES (
-            @first_name, @last_name, @overall_rating, @region_ratings, @region
+            @first_name, @last_name, @overall_rating, @region_ratings, @region, @region_locked, @status
         )
     `).run({
         ...scout,
         region_ratings: JSON.stringify(scout.region_ratings ?? {}),
         region: scout.region ?? null,
+        region_locked: scout.region_locked ? 1 : 0,
+        status: scout.status ?? 'hired',
     });
 
     if (!result.lastInsertRowid) return null;
@@ -355,6 +364,9 @@ function updateScout(id: number, scout: Record<string, unknown>) {
         ...scout,
         ...(scout.region_ratings !== undefined && {
             region_ratings: JSON.stringify(scout.region_ratings),
+        }),
+        ...(scout.region_locked !== undefined && {
+            region_locked: scout.region_locked ? 1 : 0,
         }),
     };
 

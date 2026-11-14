@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useScoutStore } from '@/stores';
-import { JuniorLeague, Scout, ScoutRating } from '@/types';
+import { JuniorLeague, Scout, ScoutRating, ScoutStatus } from '@/types';
 import ScoutModal from '@/components/draft/ScoutModal.vue';
+import LockIcon from '@/components/LockIcon.vue';
+import { autoAssignScouts, suggestLockedMoves } from '@/utils/scoutAssignment';
 
 const scoutStore = useScoutStore();
 
@@ -10,7 +12,7 @@ const showModal = ref(false);
 const selectedScout = ref<Scout | undefined>(undefined);
 
 const MAX_SCOUTS = 20;
-const canAdd = computed(() => scoutStore.scouts.length < MAX_SCOUTS);
+const canAdd = computed(() => scoutStore.hired.length < MAX_SCOUTS);
 
 // Target allotment per region
 const ALLOTMENT: Partial<Record<JuniorLeague, number>> = {
@@ -30,9 +32,88 @@ const ALLOTMENT: Partial<Record<JuniorLeague, number>> = {
 
 const allotmentRegions = Object.keys(ALLOTMENT) as JuniorLeague[];
 
-function openAdd() {
+const assigning = ref(false);
+const assignResult = ref<string | null>(null);
+
+async function autoAssign() {
+    assigning.value = true;
+    try {
+        const moves = autoAssignScouts(scoutStore.hired, ALLOTMENT);
+        await Promise.all(moves.map(m => scoutStore.update(m.scout.id, { region: m.to })));
+        assignResult.value = moves.length
+            ? `Moved ${moves.length} scout${moves.length === 1 ? '' : 's'}`
+            : 'Already optimal';
+    } finally {
+        assigning.value = false;
+    }
+}
+
+// Better layout available if locks were lifted — suggested only, never applied by auto-assign
+const lockSuggestion = computed(() => suggestLockedMoves(scoutStore.hired, ALLOTMENT));
+
+// Explicit opt-in: apply the unconstrained layout, keeping each scout's lock flag
+async function applyLockSuggestion() {
+    const suggestion = lockSuggestion.value;
+    if (!suggestion) return;
+    assigning.value = true;
+    try {
+        await Promise.all(suggestion.moves.map(m => scoutStore.update(m.scout.id, { region: m.to })));
+        assignResult.value = `Moved ${suggestion.moves.length} scout${suggestion.moves.length === 1 ? '' : 's'}`;
+    } finally {
+        assigning.value = false;
+    }
+}
+
+function toggleLock(scout: Scout) {
+    scoutStore.update(scout.id, { region_locked: !scout.region_locked });
+}
+
+// Drag scout cards between allotment rows (null target = unassign)
+type DropKey = JuniorLeague | 'unassigned';
+const draggingId = ref<number | null>(null);
+const dropTarget = ref<DropKey | null>(null);
+const draggedScout = computed(() => scoutStore.scouts.find(s => s.id === draggingId.value) ?? null);
+
+function onDragStart(e: DragEvent, scout: Scout) {
+    draggingId.value = scout.id;
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(scout.id));
+    }
+}
+
+function onDragEnd() {
+    draggingId.value = null;
+    dropTarget.value = null;
+}
+
+// Ignore leave events fired when moving between a drop zone's own children
+function onDragLeave(e: DragEvent, key: DropKey) {
+    const zone = e.currentTarget as HTMLElement;
+    if (dropTarget.value === key && !zone.contains(e.relatedTarget as Node | null)) {
+        dropTarget.value = null;
+    }
+}
+
+async function onDrop(region: JuniorLeague | null) {
+    const scout = draggedScout.value;
+    onDragEnd();
+    if (!scout || scout.region === region) return;
+    assignResult.value = null;
+    await scoutStore.update(scout.id, { region });
+}
+
+const newScoutStatus = ref<ScoutStatus>('hired');
+
+function openAdd(status: ScoutStatus = 'hired') {
     selectedScout.value = undefined;
+    newScoutStatus.value = status;
     showModal.value = true;
+}
+
+// Offer accepted — scout joins the payroll, starting in their target region (unlocked, so auto-assign can move them)
+function signOffer(scout: Scout) {
+    scoutStore.update(scout.id, { status: 'hired' });
 }
 function openEdit(scout: Scout) {
     selectedScout.value = scout;
@@ -62,20 +143,39 @@ const ratingRank: Record<string, number> = {
 
 // Scouts currently assigned to a given region
 function assignedTo(region: JuniorLeague): Scout[] {
-    return scoutStore.scouts.filter(s => s.region === region);
+    return scoutStore.hired.filter(s => s.region === region);
 }
 
-const unassigned = computed(() =>
-    scoutStore.scouts.filter(s => !s.region)
+// Best overall first (unrated last), then last name
+const sortedScouts = computed(() =>
+    [...scoutStore.hired].sort((a, b) =>
+        (ratingRank[a.overall_rating ?? 'F'] ?? 13) - (ratingRank[b.overall_rating ?? 'F'] ?? 13)
+        || a.last_name.localeCompare(b.last_name)
+    )
 );
 
-// Allotment status per region
+const unassigned = computed(() =>
+    scoutStore.hired.filter(s => !s.region)
+);
+
+// Outstanding offers, in allotment order (no region last)
+const sortedOffers = computed(() =>
+    [...scoutStore.offered].sort((a, b) => {
+        const ia = a.region ? allotmentRegions.indexOf(a.region) : -1;
+        const ib = b.region ? allotmentRegions.indexOf(b.region) : -1;
+        return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib)
+            || a.last_name.localeCompare(b.last_name);
+    })
+);
+
+// Allotment status per region (offers are shown but don't count toward the target)
 const allotmentStatus = computed(() =>
     allotmentRegions.map(region => {
         const target = ALLOTMENT[region]!;
         const scouts = assignedTo(region);
+        const offers = scoutStore.offered.filter(s => s.region === region);
         const diff = scouts.length - target;
-        return { region, target, current: scouts.length, diff, scouts };
+        return { region, target, current: scouts.length, diff, scouts, offers };
     })
 );
 
@@ -124,6 +224,74 @@ function bestSuggestion(scout: Scout): Suggestion | null {
     })[0];
 }
 
+// Best region rating a scout can actually hold: their current region, an open slot,
+// or a region where they'd beat out an unlocked scout already assigned there
+function bestFit(scout: Scout): { region: JuniorLeague | null; rating: ScoutRating | null } {
+    const candidates: JuniorLeague[] = scout.region ? [scout.region] : [];
+    for (const { region, diff, scouts } of allotmentStatus.value) {
+        if (region === scout.region) continue;
+        if (diff < 0 || scouts.some(s => !s.region_locked && compareForRegion(scout, s, region) < 0)) {
+            candidates.push(region);
+        }
+    }
+
+    const region = candidates.sort((a, b) =>
+        (ratingRank[scout.region_ratings[a] ?? 'F'] ?? 13) - (ratingRank[scout.region_ratings[b] ?? 'F'] ?? 13)
+    )[0] ?? null;
+    return { region, rating: region ? scout.region_ratings[region] ?? null : null };
+}
+
+// Scouts worth replacing: best fit of C+ or lower, or an overall of C- or lower
+const fireSuggestions = computed(() =>
+    scoutStore.hired
+        .map(scout => {
+            const fit = bestFit(scout);
+            return {
+                scout,
+                fit,
+                weakFit: (ratingRank[fit.rating ?? 'F'] ?? 13) >= ratingRank['C+'],
+                weakOverall: !!scout.overall_rating && ratingRank[scout.overall_rating] >= ratingRank['C-'],
+            };
+        })
+        .filter(s => s.weakFit || s.weakOverall)
+);
+
+// Regions short of an A+ in every slot: open slots, plus any scout below A+ (locked
+// scouts included — a lock pins the region during auto-assign, not the scout's job)
+interface UpgradeTarget {
+    region: JuniorLeague;
+    target: number;
+    open: number;
+    weak: Scout[];   // worst first
+    offers: Scout[]; // contracts already out for this region
+}
+
+const upgradeTargets = computed<UpgradeTarget[]>(() => {
+    const worst = (t: UpgradeTarget) =>
+        t.open ? 13 : ratingRank[t.weak[0].region_ratings[t.region] ?? 'F'] ?? 13;
+
+    return allotmentStatus.value
+        .map(({ region, target, diff, scouts, offers }) => ({
+            region,
+            target,
+            open: Math.max(0, -diff),
+            weak: scouts
+                .filter(s => s.region_ratings[region] !== 'A+')
+                .sort((a, b) => compareForRegion(b, a, region)),
+            offers,
+        }))
+        .filter(t => t.open || t.weak.length)
+        // Empty slots first, then higher-target regions, then the weakest coverage
+        .sort((a, b) =>
+            Number(b.open > 0) - Number(a.open > 0)
+            || b.target - a.target
+            || worst(b) - worst(a)
+        );
+});
+
+// Upgrade targets are only meaningful once the current roster is optimally placed
+const pendingMoves = computed(() => autoAssignScouts(scoutStore.hired, ALLOTMENT).length);
+
 // For over-allotted regions, flag the weakest scout
 const offloadSuggestions = computed(() =>
     allotmentStatus.value
@@ -147,13 +315,30 @@ const offloadSuggestions = computed(() =>
         <div class="flex items-center justify-between">
             <h2 class="text-sm font-medium text-slate-400 uppercase tracking-wider">
                 Scouts
-                <span class="ml-2 text-slate-600 font-normal normal-case">{{ scoutStore.scouts.length }} / {{ MAX_SCOUTS }}</span>
+                <span class="ml-2 text-slate-600 font-normal normal-case">{{ scoutStore.hired.length }} / {{ MAX_SCOUTS }}</span>
+                <span v-if="scoutStore.offered.length" class="ml-1 text-amber-500/70 font-normal normal-case">
+                    · {{ scoutStore.offered.length }} offered
+                </span>
             </h2>
-            <button
-                v-if="canAdd"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
-                @click="openAdd"
-            >+ Add Scout</button>
+            <div class="flex items-center gap-3">
+                <span v-if="assignResult" class="text-xs text-slate-500">{{ assignResult }}</span>
+                <button
+                    v-if="scoutStore.hired.length"
+                    :disabled="assigning"
+                    class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-slate-100 transition-colors"
+                    title="Assign unlocked scouts to maximize region-rating coverage. Ties go to the higher-overall scout, then to better ratings in higher-target regions."
+                    @click="autoAssign"
+                >Auto-assign</button>
+                <button
+                    class="px-4 py-2 rounded-lg text-sm font-medium border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
+                    @click="openAdd('offered')"
+                >+ Offer Contract</button>
+                <button
+                    v-if="canAdd"
+                    class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                    @click="openAdd()"
+                >+ Add Scout</button>
+            </div>
         </div>
 
         <!-- Allotment overview -->
@@ -172,7 +357,11 @@ const offloadSuggestions = computed(() =>
                     <tr
                         v-for="row in allotmentStatus"
                         :key="row.region"
-                        class="border-b border-slate-800/60"
+                        class="border-b border-slate-800/60 transition-colors"
+                        :class="dropTarget === row.region && 'bg-sky-500/10'"
+                        @dragover.prevent="dropTarget = row.region"
+                        @dragleave="onDragLeave($event, row.region)"
+                        @drop.prevent="onDrop(row.region)"
                     >
                         <td class="px-3 py-2 text-sm text-slate-300">{{ row.region }}</td>
                         <td class="px-3 py-2 text-center text-sm text-slate-500">{{ row.target }}</td>
@@ -183,16 +372,70 @@ const offloadSuggestions = computed(() =>
                             <span v-if="row.diff !== 0" class="text-xs ml-1">
                                 ({{ row.diff > 0 ? '+' : '' }}{{ row.diff }})
                             </span>
+                            <span v-if="row.offers.length" class="block text-xs font-normal text-amber-500/80">
+                                +{{ row.offers.length }} offered
+                            </span>
                         </td>
                         <td class="px-3 py-2">
-                            <div class="flex flex-wrap gap-1">
-                                <span
+                            <div class="flex flex-wrap gap-1.5">
+                                <div
                                     v-for="scout in row.scouts"
                                     :key="scout.id"
-                                    class="text-xs text-slate-400 cursor-pointer hover:text-slate-200 transition-colors"
+                                    draggable="true"
+                                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs cursor-grab active:cursor-grabbing hover:border-slate-500 transition-colors"
+                                    :class="draggingId === scout.id && 'opacity-40'"
+                                    title="Drag to another region, or click to edit"
+                                    @dragstart="onDragStart($event, scout)"
+                                    @dragend="onDragEnd"
                                     @click="openEdit(scout)"
-                                >{{ scout.first_name.charAt(0) }}. {{ scout.last_name }}<span v-if="scout.overall_rating" :class="['ml-1', ratingColor[scout.overall_rating]]">({{ scout.overall_rating }})</span></span>
-                                <span v-if="!row.scouts.length" class="text-xs text-slate-700">—</span>
+                                >
+                                    <span class="text-slate-300">{{ scout.first_name.charAt(0) }}. {{ scout.last_name }}</span>
+                                    <span v-if="scout.overall_rating" :class="ratingColor[scout.overall_rating]">({{ scout.overall_rating }})</span>
+                                    <span v-if="scout.region_ratings[row.region]"
+                                          :class="['font-medium', ratingColor[scout.region_ratings[row.region]!]]">
+                                        {{ scout.region_ratings[row.region] }}
+                                    </span>
+                                    <button
+                                        class="transition-colors"
+                                        :class="scout.region_locked ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'"
+                                        @click.stop="toggleLock(scout)"
+                                    >
+                                        <LockIcon :locked="scout.region_locked" class="w-3 h-3" />
+                                    </button>
+                                </div>
+                                <!-- Outstanding offers for this region -->
+                                <div
+                                    v-for="scout in row.offers"
+                                    :key="scout.id"
+                                    draggable="true"
+                                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-amber-500/50 bg-amber-500/5 text-xs cursor-grab active:cursor-grabbing hover:border-amber-400 transition-colors"
+                                    :class="draggingId === scout.id && 'opacity-40'"
+                                    title="Contract offered — drag to change the target region, or click to edit"
+                                    @dragstart="onDragStart($event, scout)"
+                                    @dragend="onDragEnd"
+                                    @click="openEdit(scout)"
+                                >
+                                    <span class="text-amber-400/80 font-medium uppercase tracking-wide text-[10px]">Offer</span>
+                                    <span class="text-slate-300">{{ scout.first_name.charAt(0) }}. {{ scout.last_name }}</span>
+                                    <span v-if="scout.overall_rating" :class="ratingColor[scout.overall_rating]">({{ scout.overall_rating }})</span>
+                                    <span v-if="scout.region_ratings[row.region]"
+                                          :class="['font-medium', ratingColor[scout.region_ratings[row.region]!]]">
+                                        {{ scout.region_ratings[row.region] }}
+                                    </span>
+                                </div>
+                                <!-- Preview of the dragged scout's rating for the hovered region -->
+                                <div
+                                    v-if="dropTarget === row.region && draggedScout && draggedScout.region !== row.region"
+                                    class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-dashed border-sky-400/60 bg-sky-500/10 text-xs pointer-events-none"
+                                >
+                                    <span class="text-slate-300">{{ draggedScout.first_name.charAt(0) }}. {{ draggedScout.last_name }}</span>
+                                    <span v-if="draggedScout.region_ratings[row.region]"
+                                          :class="['font-medium', ratingColor[draggedScout.region_ratings[row.region]!]]">
+                                        {{ draggedScout.region_ratings[row.region] }}
+                                    </span>
+                                    <span v-else class="text-slate-500">unrated</span>
+                                </div>
+                                <span v-else-if="!row.scouts.length && !row.offers.length" class="text-xs text-slate-700 py-1">—</span>
                             </div>
                         </td>
                     </tr>
@@ -201,11 +444,100 @@ const offloadSuggestions = computed(() =>
                     <tr class="border-t border-slate-700">
                         <td class="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Total</td>
                         <td class="px-3 py-2 text-center text-xs font-medium text-slate-400">{{ allotmentStatus.reduce((s, r) => s + r.target, 0) }}</td>
-                        <td class="px-3 py-2 text-center text-xs font-medium text-slate-400">{{ scoutStore.scouts.length }}</td>
+                        <td class="px-3 py-2 text-center text-xs font-medium text-slate-400">{{ scoutStore.hired.length }}</td>
                         <td></td>
                     </tr>
                 </tfoot>
             </table>
+            <div
+                v-if="draggingId !== null"
+                class="mt-3 rounded-lg border border-dashed px-4 py-3 text-center text-xs transition-colors"
+                :class="dropTarget === 'unassigned' ? 'border-rose-400/60 bg-rose-500/10 text-rose-300' : 'border-slate-700 text-slate-500'"
+                @dragover.prevent="dropTarget = 'unassigned'"
+                @dragleave="onDragLeave($event, 'unassigned')"
+                @drop.prevent="onDrop(null)"
+            >Drop here to unassign</div>
+        </div>
+
+        <!-- Locked scouts that would be better placed elsewhere -->
+        <div v-if="lockSuggestion">
+            <h3 class="text-xs font-medium text-amber-500/70 uppercase tracking-wider mb-3">Lock Review</h3>
+            <div class="px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-lg space-y-2">
+                <p class="text-xs text-slate-400">
+                    <template v-if="lockSuggestion.gain > 0">
+                        Moving locked scouts would improve coverage by
+                        <span class="font-medium text-emerald-400">+{{ lockSuggestion.gain }}</span>
+                        rating step{{ lockSuggestion.gain === 1 ? '' : 's' }}.
+                    </template>
+                    <template v-else>
+                        Same coverage, but better tiebreak placement (higher-overall scouts into higher-target regions).
+                    </template>
+                </p>
+                <div
+                    v-for="m in lockSuggestion.lockedMoves"
+                    :key="m.scout.id"
+                    class="flex items-center gap-2 text-xs cursor-pointer hover:text-slate-200 transition-colors"
+                    @click="openEdit(m.scout)"
+                >
+                    <span class="text-slate-200 font-medium">{{ m.scout.first_name }} {{ m.scout.last_name }}</span>
+                    <LockIcon locked class="w-3 h-3 text-amber-400" />
+                    <span class="text-slate-400">{{ m.from ?? 'Unassigned' }}</span>
+                    <span v-if="m.from && m.scout.region_ratings[m.from]" :class="ratingColor[m.scout.region_ratings[m.from]!]">
+                        {{ m.scout.region_ratings[m.from] }}
+                    </span>
+                    <span class="text-slate-600">→</span>
+                    <span class="text-slate-400">{{ m.to ?? 'Unassigned' }}</span>
+                    <span v-if="m.to && m.scout.region_ratings[m.to]" :class="ratingColor[m.scout.region_ratings[m.to]!]">
+                        {{ m.scout.region_ratings[m.to] }}
+                    </span>
+                </div>
+                <div class="flex items-center gap-3 pt-1">
+                    <span v-if="lockSuggestion.moves.length > lockSuggestion.lockedMoves.length" class="text-xs text-slate-500">
+                        + {{ lockSuggestion.moves.length - lockSuggestion.lockedMoves.length }} unlocked
+                        scout{{ lockSuggestion.moves.length - lockSuggestion.lockedMoves.length === 1 ? '' : 's' }} would shift
+                    </span>
+                    <button
+                        class="ml-auto px-3 py-1 rounded-md text-xs font-medium border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 disabled:opacity-50 transition-colors"
+                        :disabled="assigning"
+                        title="Apply this layout once. Locks stay on, pinning scouts to their new regions."
+                        @click="applyLockSuggestion"
+                    >Apply layout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contract offers -->
+        <div v-if="sortedOffers.length">
+            <h3 class="text-xs font-medium text-amber-500/70 uppercase tracking-wider mb-3">Contract Offers</h3>
+            <div class="space-y-2">
+                <div
+                    v-for="scout in sortedOffers"
+                    :key="scout.id"
+                    class="flex items-center gap-4 px-4 py-3 bg-amber-500/5 border border-dashed border-amber-500/30 rounded-lg cursor-pointer hover:bg-amber-500/10 transition-colors"
+                    @click="openEdit(scout)"
+                >
+                    <span class="text-sm font-medium text-slate-200 w-36 flex-shrink-0">
+                        {{ scout.first_name }} {{ scout.last_name }}
+                        <span v-if="scout.overall_rating" :class="['text-xs ml-1', ratingColor[scout.overall_rating]]">({{ scout.overall_rating }})</span>
+                    </span>
+                    <template v-if="scout.region">
+                        <span class="text-xs text-slate-500">Targeting →</span>
+                        <span class="text-xs text-slate-400">{{ scout.region }}</span>
+                        <span v-if="scout.region_ratings[scout.region]"
+                              :class="['text-xs', ratingColor[scout.region_ratings[scout.region]!]]">
+                            {{ scout.region_ratings[scout.region] }}
+                        </span>
+                        <span v-else class="text-xs text-slate-600">unrated</span>
+                    </template>
+                    <span v-else class="text-xs text-slate-600">No target region</span>
+                    <button
+                        class="ml-auto px-3 py-1 rounded-md text-xs font-medium bg-emerald-700/70 hover:bg-emerald-600 disabled:opacity-40 disabled:hover:bg-emerald-700/70 text-slate-100 transition-colors"
+                        :disabled="!canAdd"
+                        :title="canAdd ? 'Offer accepted — add to payroll' : 'Roster full — release a scout first'"
+                        @click.stop="signOffer(scout)"
+                    >Signed</button>
+                </div>
+            </div>
         </div>
 
         <!-- Unassigned scouts with suggestions -->
@@ -215,7 +547,11 @@ const offloadSuggestions = computed(() =>
                 <div
                     v-for="scout in unassigned"
                     :key="scout.id"
-                    class="flex items-center gap-4 px-4 py-3 bg-slate-800/40 border border-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-800/70 transition-colors"
+                    draggable="true"
+                    class="flex items-center gap-4 px-4 py-3 bg-slate-800/40 border border-slate-700/50 rounded-lg cursor-grab active:cursor-grabbing hover:bg-slate-800/70 transition-colors"
+                    :class="draggingId === scout.id && 'opacity-40'"
+                    @dragstart="onDragStart($event, scout)"
+                    @dragend="onDragEnd"
                     @click="openEdit(scout)"
                 >
                     <span class="text-sm font-medium text-slate-200 w-36 flex-shrink-0">
@@ -267,8 +603,104 @@ const offloadSuggestions = computed(() =>
             </div>
         </div>
 
+        <!-- Fire suggestions -->
+        <div v-if="fireSuggestions.length">
+            <h3 class="text-xs font-medium text-rose-500/70 uppercase tracking-wider mb-3">Consider Firing</h3>
+            <div class="space-y-2">
+                <div
+                    v-for="{ scout, fit, weakFit, weakOverall } in fireSuggestions"
+                    :key="scout.id"
+                    class="flex items-center gap-4 px-4 py-3 bg-rose-500/5 border border-rose-500/20 rounded-lg cursor-pointer hover:bg-rose-500/10 transition-colors"
+                    @click="openEdit(scout)"
+                >
+                    <span class="text-sm font-medium text-slate-200 w-36 flex-shrink-0">
+                        {{ scout.first_name }} {{ scout.last_name }}
+                        <span v-if="scout.overall_rating" :class="['text-xs ml-1', ratingColor[scout.overall_rating]]">({{ scout.overall_rating }})</span>
+                        <LockIcon v-if="scout.region_locked" locked class="inline w-3 h-3 ml-0.5 -mt-0.5 text-amber-400" />
+                    </span>
+                    <template v-if="weakOverall">
+                        <span class="text-xs text-rose-400">Low overall</span>
+                        <!-- Skip when the best-fit display below already names the same region -->
+                        <template v-if="scout.region && !(weakFit && fit.region === scout.region)">
+                            <span class="text-xs text-slate-500">Assigned →</span>
+                            <span class="text-xs text-slate-400">{{ scout.region }}</span>
+                            <span v-if="scout.region_ratings[scout.region]"
+                                  :class="['text-xs', ratingColor[scout.region_ratings[scout.region]!]]">
+                                {{ scout.region_ratings[scout.region] }}
+                            </span>
+                        </template>
+                    </template>
+                    <template v-if="weakFit">
+                        <template v-if="fit.region">
+                            <span class="text-xs text-slate-500">Best fit →</span>
+                            <span class="text-xs text-slate-400">{{ fit.region }}</span>
+                            <span v-if="fit.rating" :class="['text-xs', ratingColor[fit.rating]]">{{ fit.rating }}</span>
+                            <span v-else class="text-xs text-slate-600">unrated</span>
+                        </template>
+                        <span v-else class="text-xs text-slate-600">Can't beat out any assigned scout</span>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upgrade targets -->
+        <div v-if="upgradeTargets.length">
+            <h3 class="text-xs font-medium text-sky-500/70 uppercase tracking-wider mb-3">Upgrade Targets</h3>
+            <p v-if="pendingMoves" class="text-xs text-slate-500 mb-3">
+                Auto-assign would make {{ pendingMoves }} move{{ pendingMoves === 1 ? '' : 's' }} — run it first so these reflect your best layout.
+            </p>
+            <p v-else-if="!canAdd" class="text-xs text-slate-500 mb-3">
+                Roster full — each hire means releasing a scout.
+            </p>
+            <div class="space-y-2">
+                <div
+                    v-for="t in upgradeTargets"
+                    :key="t.region"
+                    class="flex items-center gap-4 px-4 py-3 bg-sky-500/5 border border-sky-500/20 rounded-lg"
+                >
+                    <span class="text-sm font-medium text-slate-200 w-36 flex-shrink-0">
+                        {{ t.region }}
+                        <span class="text-xs text-slate-500 font-normal ml-1">target {{ t.target }}</span>
+                    </span>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span v-if="t.open > t.offers.length" class="text-xs font-medium text-rose-400">
+                            {{ t.open - t.offers.length }} open — hire an A+ {{ t.region }} scout
+                        </span>
+                        <span
+                            v-for="scout in t.offers"
+                            :key="scout.id"
+                            class="text-xs cursor-pointer hover:text-slate-200 transition-colors"
+                            @click="openEdit(scout)"
+                        >
+                            <span class="text-amber-500/80">Offer out</span>
+                            <span class="text-slate-400 ml-1">{{ scout.first_name.charAt(0) }}. {{ scout.last_name }}</span>
+                            <span v-if="scout.region_ratings[t.region]"
+                                  :class="['ml-1 font-medium', ratingColor[scout.region_ratings[t.region]!]]">
+                                {{ scout.region_ratings[t.region] }}
+                            </span>
+                        </span>
+                        <span
+                            v-for="scout in t.weak"
+                            :key="scout.id"
+                            class="text-xs cursor-pointer hover:text-slate-200 transition-colors"
+                            @click="openEdit(scout)"
+                        >
+                            <span class="text-slate-500">Upgrade</span>
+                            <span class="text-slate-400 ml-1">{{ scout.first_name.charAt(0) }}. {{ scout.last_name }}</span>
+                            <LockIcon v-if="scout.region_locked" locked class="inline w-3 h-3 ml-0.5 -mt-0.5 text-amber-400" />
+                            <span v-if="scout.region_ratings[t.region]"
+                                  :class="['ml-1 font-medium', ratingColor[scout.region_ratings[t.region]!]]">
+                                {{ scout.region_ratings[t.region] }}
+                            </span>
+                            <span v-else class="ml-1 text-slate-600">unrated</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Full scout list -->
-        <div v-if="scoutStore.scouts.length === 0"
+        <div v-if="scoutStore.hired.length === 0"
              class="rounded-xl border border-dashed border-slate-700 p-12 text-center text-slate-500 text-sm">
             No scouts assigned. Add up to {{ MAX_SCOUTS }}.
         </div>
@@ -276,7 +708,7 @@ const offloadSuggestions = computed(() =>
             <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">All Scouts</h3>
             <div class="space-y-2">
                 <div
-                    v-for="scout in scoutStore.scouts"
+                    v-for="scout in sortedScouts"
                     :key="scout.id"
                     class="flex items-start gap-4 px-4 py-3 bg-slate-800/40 border border-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-800/70 transition-colors"
                     @click="openEdit(scout)"
@@ -298,6 +730,14 @@ const offloadSuggestions = computed(() =>
                             <span v-else class="text-slate-700">Unassigned</span>
                         </p>
                     </div>
+                    <button
+                        class="flex-shrink-0 mt-0.5 p-1 rounded transition-colors"
+                        :class="scout.region_locked ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'"
+                        :title="scout.region_locked ? 'Locked — auto-assign will keep this region' : 'Unlocked — auto-assign may move this scout'"
+                        @click.stop="toggleLock(scout)"
+                    >
+                        <LockIcon :locked="scout.region_locked" class="w-4 h-4" />
+                    </button>
                     <div class="flex flex-wrap gap-1.5">
                         <span
                             v-for="(rating, region) in scout.region_ratings"
@@ -312,6 +752,6 @@ const offloadSuggestions = computed(() =>
             </div>
         </div>
 
-        <ScoutModal v-if="showModal" :scout="selectedScout" @close="onClose" @saved="onClose" />
+        <ScoutModal v-if="showModal" :scout="selectedScout" :status="newScoutStatus" @close="onClose" @saved="onClose" />
     </div>
 </template>

@@ -197,7 +197,7 @@ async function remove() {
                         <label class="block text-xs text-slate-400 mb-1">Scout</label>
                         <select v-model="form.scout_id" :class="inputClass">
                             <option :value="null">—</option>
-                            <option v-for="s in scoutStore.scouts" :key="s.id" :value="s.id">
+                            <option v-for="s in scoutStore.hired" :key="s.id" :value="s.id">
                                 {{ s.first_name }} {{ s.last_name }}
                             </option>
                         </select>

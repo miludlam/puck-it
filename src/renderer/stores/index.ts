@@ -181,6 +181,10 @@ export const usePickStore = defineStore('picks', () => {
 export const useScoutStore = defineStore('scouts', () => {
     const scouts = ref<Scout[]>([]);
 
+    // Scouts on the payroll vs. those with an outstanding contract offer
+    const hired = computed(() => scouts.value.filter(s => s.status === 'hired'));
+    const offered = computed(() => scouts.value.filter(s => s.status === 'offered'));
+
     async function load() {
         const result = await window.db['scout:getAll']();
         scouts.value = result as Scout[];
@@ -201,7 +205,7 @@ export const useScoutStore = defineStore('scouts', () => {
         scouts.value = scouts.value.filter(s => s.id !== id);
     }
 
-    return { scouts, load, add, update, remove };
+    return { scouts, hired, offered, load, add, update, remove };
 });
 
 export const useScoutedPlayerStore = defineStore('scoutedPlayers', () => {
