@@ -85,8 +85,10 @@ export const usePlayerStore = defineStore('players', () => {
         patchPlayer(result.player);
         if (result.occupant) patchPlayer(result.occupant);
     }
+    // Injured reserve (`${league}-IR`) isn't a line, so it survives a clear
     async function clearLines(league: LineLeague) {
-        const leaguePlayers = players.value.filter(p => p.line_league === league);
+        const onLine = (p: Player) => p.line_league === league && p.line_slot !== `${league}-IR`;
+        const leaguePlayers = players.value.filter(onLine);
 
         await Promise.all(
             leaguePlayers.map(p => window.db['player:update'](p.id, {
@@ -97,7 +99,7 @@ export const usePlayerStore = defineStore('players', () => {
 
         // Patch local state
         players.value = players.value.map(p =>
-            p.line_league === league
+            onLine(p)
                 ? { ...p, line_slot: null, line_league: null }
                 : p
         );

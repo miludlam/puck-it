@@ -5,6 +5,7 @@ import { usePlayerStore } from '@/stores';
 import LineBuilderLines from './LineBuilderLines.vue';
 import LineBuilderPool from './LineBuilderPool.vue';
 import LineBuilderScratches from "./LineBuilderScratches.vue";
+import LineBuilderIR from './LineBuilderIR.vue';
 import ContextMenu, { ContextMenuItem } from '@/components/ContextMenu.vue';
 import PlayerModal from './PlayerModal.vue';
 
@@ -16,6 +17,16 @@ const props = defineProps<{
 
 const confirmClear = ref(false);
 
+// Injured reserve shares one slot key; any number of players can hold it
+const irSlot = computed(() => `${props.league}-IR`);
+const isIR = (slot: string | null) => slot === irSlot.value;
+
+const irPlayers = computed(() =>
+    playerStore.players
+        .filter(p => p.line_league === props.league && isIR(p.line_slot))
+        .sort((a, b) => b.overall - a.overall)
+);
+
 // Unslotted players, highest overall first
 const poolPlayers = computed(() =>
     playerStore.players
@@ -26,7 +37,7 @@ const poolPlayers = computed(() =>
 const slotMap = computed(() => {
     const map: Record<string, Player | null> = {};
     for (const player of playerStore.players) {
-        if (player.line_slot && player.line_league === props.league) {
+        if (player.line_slot && player.line_league === props.league && !isIR(player.line_slot)) {
             map[player.line_slot] = player;
         }
     }
@@ -35,7 +46,7 @@ const slotMap = computed(() => {
 
 const nhlSlottedCount = computed(() =>
     props.league === 'NHL'
-        ? playerStore.players.filter(p => p.line_slot !== null && p.line_league === 'NHL').length
+        ? playerStore.players.filter(p => p.line_slot !== null && p.line_league === 'NHL' && !isIR(p.line_slot)).length
         : null
 );
 
@@ -71,9 +82,28 @@ const moveItem = (player: Player): ContextMenuItem => {
     };
 };
 
+const irItem = (player: Player, fromSlot: string | null): ContextMenuItem => ({
+    label: 'Place on IR',
+    action: () => handleDrop(player.id, fromSlot, irSlot.value),
+});
+
 // Slotted players (lines and scratches)
 function openSlotMenu(player: Player, event: MouseEvent) {
-    menu.value = { x: event.clientX, y: event.clientY, items: [moveItem(player), viewInfoItem(player)] };
+    menu.value = {
+        x: event.clientX,
+        y: event.clientY,
+        items: [irItem(player, player.line_slot), moveItem(player), viewInfoItem(player)],
+    };
+}
+
+// Injured reserve players
+function openIRMenu(player: Player, event: MouseEvent) {
+    const items: ContextMenuItem[] = [{
+        label: 'Activate from IR',
+        action: () => handleDrop(player.id, irSlot.value, null),
+    }];
+    items.push(moveItem(player), viewInfoItem(player));
+    menu.value = { x: event.clientX, y: event.clientY, items };
 }
 
 function openPoolMenu(player: Player, event: MouseEvent) {
@@ -98,7 +128,7 @@ function openPoolMenu(player: Player, event: MouseEvent) {
         });
     }
 
-    items.push(moveItem(player), viewInfoItem(player));
+    items.push(irItem(player, null), moveItem(player), viewInfoItem(player));
     menu.value = { x: event.clientX, y: event.clientY, items };
 }
 
@@ -106,16 +136,25 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
     const player = playerStore.players.find(p => p.id === playerID);
     if (!player) return;
 
-    const occupant = toSlot ? slotMap.value[toSlot] ?? null : null;
+    // IR holds any number of players, so nobody is displaced into or out of it
+    const occupant = toSlot && !isIR(toSlot) ? slotMap.value[toSlot] ?? null : null;
+    const occupantSlot = isIR(fromSlot) ? null : fromSlot;
 
     await playerStore.assignSlot(
         playerID,
         toSlot,
         toSlot ? props.league : null,
         occupant?.id ?? null,
-        fromSlot,
-        fromSlot ? props.league : null,
+        occupantSlot,
+        occupantSlot ? props.league : null,
     );
+
+    // Keep the player's status in step with IR (the header roster count skips Injured)
+    if (isIR(toSlot) && player.status !== 'Injured') {
+        await playerStore.update(playerID, { status: 'Injured' });
+    } else if (isIR(fromSlot) && !isIR(toSlot) && player.status === 'Injured') {
+        await playerStore.update(playerID, { status: 'Active' });
+    }
 }
 </script>
 
@@ -161,6 +200,14 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
                     @drop="(playerID, fromSlot, toSlot) => handleDrop(playerID, fromSlot, toSlot)"
                     @contextmenu="openSlotMenu"
                 />
+
+                <LineBuilderIR
+                    :players="irPlayers"
+                    :slotKey="irSlot"
+                    :league="league"
+                    @drop="(playerID, fromSlot) => handleDrop(playerID, fromSlot, irSlot)"
+                    @contextmenu="openIRMenu"
+                />
             </div>
 
             <!-- Right column — pool -->
@@ -193,7 +240,7 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
             <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 w-80">
                 <h3 class="text-base font-semibold mb-2">Clear all lines?</h3>
                 <p class="text-sm text-slate-400 mb-5">
-                    All {{ props.league }} players will be moved back to the pool.
+                    All {{ props.league }} players will be moved back to the pool. IR stays as is.
                 </p>
                 <div class="flex gap-3">
                     <button
