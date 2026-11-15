@@ -74,6 +74,7 @@ const pickLabel = (p: Pick) =>
     `${normalizeYear(p.year)} ${roundLabel(p.round)}${p.original_owner !== myTeam.value ? ` (via ${p.original_owner})` : ''}`;
 
 const outPlayers = computed(() => playerStore.players.filter(p => outPlayerIds.value.has(p.id)));
+const outPicks = computed(() => myPicks.value.filter(p => outPickIds.value.has(p.id)));
 
 /* ---------- Receiving ---------- */
 type IncomingRow = Omit<IncomingPlayer, 'potential_level' | 'potential_chance' | 'player_type'> & {
@@ -202,6 +203,35 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
             <!-- Sending -->
             <section class="space-y-4 p-4 bg-slate-800/30 border border-slate-700/50 rounded-lg">
                 <h3 class="text-sm font-semibold text-rose-300">Sending</h3>
+
+                <!-- Everything selected so far, pinned above the pickers -->
+                <div class="rounded-md border border-rose-500/30 bg-rose-500/5 p-2 space-y-1">
+                    <p class="text-[10px] font-medium text-rose-300/80 uppercase tracking-wider">
+                        Selected ({{ outPlayers.length + outPicks.length }})
+                    </p>
+                    <div
+                        v-for="p in outPlayers"
+                        :key="`player-${p.id}`"
+                        class="flex items-center gap-2 px-2 py-1 rounded text-xs text-rose-100 bg-rose-500/10"
+                    >
+                        <span class="w-8 text-rose-300/70">{{ p.position }}</span>
+                        <span class="flex-1 truncate font-medium">{{ p.first_name }} {{ p.last_name }}</span>
+                        <span class="text-rose-300/70">{{ p.roster_league }} · {{ p.age }} · {{ p.overall }}</span>
+                        <span class="w-24 text-right text-rose-300/70">{{ p.aav > 0 ? `${formatCap(p.aav)}×${p.years_remaining}` : '—' }}</span>
+                        <span v-if="p.clause" class="text-amber-400">{{ p.clause }}</span>
+                        <button type="button" class="text-rose-300/60 hover:text-rose-200" title="Remove" @click="togglePlayer(p.id)">✕</button>
+                    </div>
+                    <div
+                        v-for="p in outPicks"
+                        :key="`pick-${p.id}`"
+                        class="flex items-center gap-2 px-2 py-1 rounded text-xs text-rose-100 bg-rose-500/10"
+                    >
+                        <span class="w-8 text-rose-300/70">Pick</span>
+                        <span class="flex-1 truncate font-medium">{{ pickLabel(p) }}</span>
+                        <button type="button" class="text-rose-300/60 hover:text-rose-200" title="Remove" @click="togglePick(p.id)">✕</button>
+                    </div>
+                    <p v-if="!outPlayers.length && !outPicks.length" class="text-xs text-slate-600 px-2">Nothing selected yet.</p>
+                </div>
 
                 <div>
                     <p :class="sectionHeader">Players</p>
