@@ -272,7 +272,7 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
                         @click="confirmClear = false"
                     >Cancel</button>
                     <button
-                        class="flex-1 px-4 py-2 rounded-lg text-sm bg-rose-600 hover:bg-rose-500 text-white font-medium transition-colors"
+                        class="flex-1 px-4 py-2 rounded-lg text-sm bg-rose-600 hover:bg-rose-700 text-white font-medium transition-colors"
                         @click="async () => { await playerStore.clearLines(props.league); confirmClear = false; }"
                     >Clear</button>
                 </div>

@@ -8,12 +8,13 @@
     box-sizing: border-box;
 }
 
+/* Colours come from the theme (src/renderer/utils/theme.ts) */
 html, body, #app {
     height: 100%;
     margin: 0;
     padding: 0;
-    background: #0a0a0f;
-    color: #e2e8f0;
+    background: rgb(var(--c-slate-950, 10 10 15));
+    color: rgb(var(--c-slate-200, 226 232 240));
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
 }
@@ -28,12 +29,22 @@ html, body, #app {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #334155;
+    background: rgb(var(--c-slate-700));
     border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+    background: rgb(var(--c-slate-600));
+}
+
+/* Native controls (select menus, checkboxes, number spinners) follow the theme */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* A visible focus ring for keyboard users on anything without its own focus style */
+:focus-visible {
+    outline: 2px solid rgb(var(--c-sky-500));
+    outline-offset: 2px;
 }
 
 .drag-region {

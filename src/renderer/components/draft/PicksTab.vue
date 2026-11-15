@@ -4,6 +4,7 @@ import { usePickStore, useFranchiseStore } from '@/stores';
 import { Pick, DraftRound } from '@/types';
 import PickModal from '@/components/draft/PickModal.vue';
 import DraftPlanner from '@/components/draft/DraftPlanner.vue';
+import { readableOn } from '@/utils/theme';
 
 const pickStore = usePickStore();
 const franchiseStore = useFranchiseStore();
@@ -120,8 +121,8 @@ function teamColor(id: string): string {
                                 <button
                                     v-for="pick in picksForCell(year, round)"
                                     :key="pick.id"
-                                    class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-opacity hover:opacity-75 text-white w-full justify-center"
-                                    :style="{ backgroundColor: teamColor(pick.original_owner) }"
+                                    class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-opacity hover:opacity-75 w-full justify-center"
+                                    :style="{ backgroundColor: teamColor(pick.original_owner), color: readableOn(teamColor(pick.original_owner)) }"
                                     @click="openEdit(pick)"
                                 >
                                     {{ teamName(pick.original_owner) }}

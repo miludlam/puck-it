@@ -99,7 +99,7 @@ const history = computed(() =>
         <template v-else>
             <template v-if="confirmReroll">
                 <span class="text-slate-400">Re-roll this season's settings?</span>
-                <button class="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-500 text-white" @click="rollFields(['class', 'prospect'])">Re-roll</button>
+                <button class="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white" @click="rollFields(['class', 'prospect'])">Re-roll</button>
                 <button class="text-slate-500 hover:text-slate-300" @click="confirmReroll = false">Cancel</button>
             </template>
             <button

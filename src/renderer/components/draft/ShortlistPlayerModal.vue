@@ -168,8 +168,8 @@ async function removeFromShortlist() {
                 <button
                     type="submit"
                     :disabled="!canSave"
-                    class="px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors hover:opacity-90 disabled:opacity-40"
-                    :style="{ backgroundColor: 'var(--team-primary)' }"
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90 disabled:opacity-40"
+                    :style="{ backgroundColor: 'var(--team-primary)', color: 'var(--team-on-primary)' }"
                 >Save</button>
             </div>
         </form>

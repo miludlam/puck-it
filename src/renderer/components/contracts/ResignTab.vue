@@ -143,7 +143,7 @@ async function startDeal(p: Player) {
                     <td class="px-3 py-2 text-right whitespace-nowrap">
                         <template v-if="confirmStartId === p.id">
                             <span class="text-xs text-slate-400 mr-2">Replace {{ p.aav > 0 ? `${formatCap(p.aav)} × ${p.years_remaining}` : 'the current deal' }}?</span>
-                            <button class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors mr-1" @click="startDeal(p)">Confirm</button>
+                            <button class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors mr-1" @click="startDeal(p)">Confirm</button>
                             <button class="px-2.5 py-1 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors" @click="confirmStartId = null">Cancel</button>
                         </template>
                         <template v-else>

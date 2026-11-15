@@ -338,7 +338,7 @@ watch(positionGroup, () => {
                 <div v-else class="flex items-center gap-3">
                     <span class="text-xs text-slate-400">Are you sure? This cannot be undone.</span>
                     <button
-                        class="px-3 py-1.5 rounded-lg text-xs bg-rose-600 hover:bg-rose-500 text-white transition-colors"
+                        class="px-3 py-1.5 rounded-lg text-xs bg-rose-600 hover:bg-rose-700 text-white transition-colors"
                         @click="remove"
                     >Confirm</button>
                     <button
@@ -355,8 +355,8 @@ watch(positionGroup, () => {
                 >{{ props.readonly ? 'Close' : 'Cancel' }}</button>
                 <button
                     v-if="!props.readonly"
-                    class="px-4 py-2 rounded-lg text-sm hover:bg-sky-500 text-white font-medium transition-colors"
-                    :style="{ backgroundColor: 'var(--team-primary)' }"
+                    class="px-4 py-2 rounded-lg text-sm hover:bg-sky-500 font-medium transition-colors"
+                    :style="{ backgroundColor: 'var(--team-primary)', color: 'var(--team-on-primary)' }"
                     @click="save"
                 >Save</button>
             </div>

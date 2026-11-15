@@ -254,7 +254,7 @@ async function remove() {
                 <button v-if="!confirmDelete" class="text-xs text-rose-400 hover:text-rose-300 transition-colors" @click="confirmDelete = true">Remove from shortlist</button>
                 <div v-else class="flex items-center gap-3">
                     <span class="text-xs text-slate-400">Are you sure?</span>
-                    <button class="px-3 py-1.5 rounded-lg text-xs bg-rose-600 hover:bg-rose-500 text-white transition-colors" @click="remove">Confirm</button>
+                    <button class="px-3 py-1.5 rounded-lg text-xs bg-rose-600 hover:bg-rose-700 text-white transition-colors" @click="remove">Confirm</button>
                     <button class="px-3 py-1.5 rounded-lg text-xs border border-slate-600 text-slate-400 hover:text-slate-200 transition-colors" @click="confirmDelete = false">Cancel</button>
                 </div>
             </div>
@@ -263,8 +263,8 @@ async function remove() {
             <div class="flex justify-end gap-3 pt-4 border-t border-slate-700">
                 <button class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors" @click="emit('close')">Cancel</button>
                 <button
-                    class="px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors hover:opacity-90"
-                    :style="{ backgroundColor: 'var(--team-primary)' }"
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90"
+                    :style="{ backgroundColor: 'var(--team-primary)', color: 'var(--team-on-primary)' }"
                     @click="save"
                 >Save</button>
             </div>

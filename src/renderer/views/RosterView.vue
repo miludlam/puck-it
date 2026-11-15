@@ -69,7 +69,7 @@ const itsByGroup = computed(() => {
                 <template v-if="confirmClear">
                     <span class="text-sm text-slate-400">Clear all players?</span>
                     <button
-                        class="px-3 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
+                        class="px-3 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors"
                         @click="onClearRoster"
                     >Confirm</button>
                     <button
@@ -83,8 +83,8 @@ const itsByGroup = computed(() => {
                         @click="onClearRoster"
                     >Clear Roster</button>
                     <button
-                        class="px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
-                        :style="{ backgroundColor: 'var(--team-primary)' }"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        :style="{ backgroundColor: 'var(--team-primary)', color: 'var(--team-on-primary)' }"
                         @click="openAdd"
                     >+ Add Player</button>
                 </template>

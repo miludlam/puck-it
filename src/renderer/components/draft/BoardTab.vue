@@ -431,7 +431,7 @@ const openSpots = computed(() =>
                             <button
                                 :disabled="!validOverall"
                                 :title="validOverall ? undefined : 'Enter the overall shown in-game after the draft'"
-                                class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white transition-colors mr-1"
+                                class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white transition-colors mr-1"
                                 @click="draftPlayer(row.sp)"
                             >Confirm</button>
                             <button
@@ -483,7 +483,7 @@ const openSpots = computed(() =>
                         @click="confirmClearClass = false"
                     >Cancel</button>
                     <button
-                        class="flex-1 px-4 py-2 rounded-lg text-sm bg-rose-600 hover:bg-rose-500 text-white font-medium transition-colors"
+                        class="flex-1 px-4 py-2 rounded-lg text-sm bg-rose-600 hover:bg-rose-700 text-white font-medium transition-colors"
                         @click="clearClass"
                     >Clear</button>
                 </div>

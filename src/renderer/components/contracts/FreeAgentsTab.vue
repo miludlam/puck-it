@@ -74,7 +74,7 @@ async function clearClosed() {
                     >Clear declined / signed elsewhere ({{ closedCount }})</button>
                     <span v-else class="flex items-center gap-2 text-xs text-slate-400">
                         Remove {{ closedCount }}?
-                        <button class="px-2.5 py-1 rounded text-xs bg-rose-600 hover:bg-rose-500 text-white transition-colors" @click="clearClosed">Confirm</button>
+                        <button class="px-2.5 py-1 rounded text-xs bg-rose-600 hover:bg-rose-700 text-white transition-colors" @click="clearClosed">Confirm</button>
                         <button class="px-2.5 py-1 rounded text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors" @click="confirmClear = false">Cancel</button>
                     </span>
                 </template>
@@ -147,13 +147,13 @@ async function clearClosed() {
                     <td class="px-3 py-2 text-right whitespace-nowrap">
                         <template v-if="signingId === fa.id">
                             <span class="text-xs text-slate-400 mr-2">Add to the {{ fa.target_league }} roster at {{ terms(fa.offer_aav, fa.offer_years) }}?</span>
-                            <button class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors mr-1" @click="sign(fa)">Confirm</button>
+                            <button class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors mr-1" @click="sign(fa)">Confirm</button>
                             <button class="px-2.5 py-1 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors" @click="signingId = null">Cancel</button>
                         </template>
                         <template v-else>
                             <button
                                 v-if="fa.status === 'Accepted'"
-                                class="mr-3 px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                                class="mr-3 px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
                                 @click="signingId = fa.id"
                             >Sign to roster</button>
                             <button class="text-xs text-slate-400 hover:text-slate-200 transition-colors" @click="editing = fa">

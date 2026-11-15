@@ -333,7 +333,7 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
                     </span>
                     <button
                         :disabled="executing"
-                        class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors"
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white transition-colors"
                         @click="execute"
                     >Confirm</button>
                     <button class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200" @click="confirming = false">Cancel</button>
@@ -341,8 +341,8 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
                 <button
                     v-else
                     :disabled="problems.length > 0"
-                    class="ml-auto px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors hover:opacity-90 disabled:opacity-40"
-                    :style="{ backgroundColor: 'var(--team-primary)' }"
+                    class="ml-auto px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-90 disabled:opacity-40"
+                    :style="{ backgroundColor: 'var(--team-primary)', color: 'var(--team-on-primary)' }"
                     @click="confirming = true"
                 >Execute trade</button>
             </div>

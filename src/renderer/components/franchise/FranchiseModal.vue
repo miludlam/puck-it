@@ -76,8 +76,8 @@ async function save() {
                     @click="emit('close')"
                 >Cancel</button>
                 <button
-                    class="px-4 py-2 rounded-lg text-sm hover:bg-sky-500 text-white font-medium transition-colors"
-                    :style="{ backgroundColor: 'var(--team-primary)' }"
+                    class="px-4 py-2 rounded-lg text-sm hover:bg-sky-500 font-medium transition-colors"
+                    :style="{ backgroundColor: 'var(--team-primary)', color: 'var(--team-on-primary)' }"
                     @click="save"
                 >Save</button>
             </div>

@@ -315,7 +315,7 @@ const offloadSuggestions = computed(() =>
                 <button
                     v-if="scoutStore.hired.length"
                     :disabled="assigning"
-                    class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-slate-100 transition-colors"
+                    class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white transition-colors"
                     title="Assign unlocked scouts to maximize region-rating coverage. Ties go to the higher-overall scout, then to better ratings in higher-target regions."
                     @click="autoAssign"
                 >Auto-assign</button>
@@ -528,7 +528,7 @@ const offloadSuggestions = computed(() =>
                     </template>
                     <span v-else class="text-xs text-slate-600">No target region</span>
                     <button
-                        class="ml-auto px-3 py-1 rounded-md text-xs font-medium bg-emerald-700/70 hover:bg-emerald-600 disabled:opacity-40 disabled:hover:bg-emerald-700/70 text-slate-100 transition-colors"
+                        class="ml-auto px-3 py-1 rounded-md text-xs font-medium bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:hover:bg-emerald-700 text-white transition-colors"
                         :disabled="!canAdd"
                         :title="canAdd ? 'Offer accepted — add to payroll' : 'Roster full — release a scout first'"
                         @click.stop="signOffer(scout)"

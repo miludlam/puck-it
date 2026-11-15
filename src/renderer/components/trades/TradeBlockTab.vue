@@ -154,7 +154,7 @@ const depthList = (group: Player[]) =>
                     </select>
                     <button
                         :disabled="!selectionCount"
-                        class="px-4 py-1.5 rounded-lg text-xs font-medium bg-sky-700 hover:bg-sky-600 disabled:opacity-40 text-slate-100 transition-colors"
+                        class="px-4 py-1.5 rounded-lg text-xs font-medium bg-sky-700 hover:bg-sky-600 disabled:opacity-40 text-white transition-colors"
                         @click="emit('trade', [...selectedPlayers], [...selectedPicks])"
                     >Build trade{{ selectionCount ? ` (${selectionCount})` : '' }} →</button>
                 </div>
