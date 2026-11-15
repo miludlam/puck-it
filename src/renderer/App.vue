@@ -6,13 +6,14 @@ import AppSidebar from '@/components/AppSidebar.vue';
 import { useTeamTheme } from '@/composables/useTeamTheme';
 useTeamTheme();
 
-import { usePlayerStore, useFranchiseStore, usePickStore, useScoutStore, useScoutedPlayerStore } from "@/stores";
+import { usePlayerStore, useFranchiseStore, usePickStore, useScoutStore, useScoutedPlayerStore, useTradeStore } from "@/stores";
 
 const playerStore = usePlayerStore();
 const franchiseStore = useFranchiseStore();
 const pickStore = usePickStore();
 const scoutStore = useScoutStore();
 const scoutedPlayerStore = useScoutedPlayerStore();
+const tradeStore = useTradeStore();
 
 onMounted(async () => {
     await Promise.all([
@@ -22,6 +23,7 @@ onMounted(async () => {
         pickStore.load(),
         scoutStore.load(),
         scoutedPlayerStore.load(),
+        tradeStore.load(),
     ]);
 })
 </script>

@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { Franchise, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team } from "@/types";
+import { Franchise, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStatus, Trade, TradeRequest } from "@/types";
 
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
@@ -16,9 +16,13 @@ export const usePlayerStore = defineStore('players', () => {
         players.value.filter(player => player.roster_league === 'ITS')
     );
 
-    // For Persistent app header
+    // For Persistent app header. A contract is any salary > 0; NHL/AHL deals count
+    // toward the 50-contract limit, signed ITS players are exempt (separate 40 limit).
     const contractCount = computed(() =>
-        players.value.filter(player => player.aav > 0).length
+        players.value.filter(player => player.aav > 0 && player.roster_league !== 'ITS').length
+    );
+    const exemptContractCount = computed(() =>
+        its.value.filter(player => player.aav > 0).length
     );
     const AHL_CAP_EXEMPTION = 1.15;
     const nhlCapHit = computed(() => {
@@ -37,7 +41,7 @@ export const usePlayerStore = defineStore('players', () => {
         const result = await window.db['player:getAll']();
         players.value = result as Player[];
     }
-    async function add(player: Omit<Player, 'id' | 'created_at'>) {
+    async function add(player: Omit<Player, 'id' | 'created_at' | 'on_block'>) {
         const result = await window.db['player:add'](player);
         const created = result as Player;
         players.value = [...players.value, created];
@@ -102,7 +106,7 @@ export const usePlayerStore = defineStore('players', () => {
     return {
         players,
         nhl, ahl, its,
-        contractCount, nhlCapHit, nhlRosterCount,
+        contractCount, exemptContractCount, nhlCapHit, nhlRosterCount,
         load, add, update, remove, assignSlot, clearLines, clearAll,
     };
 });
@@ -134,11 +138,15 @@ export const useFranchiseStore = defineStore('franchise', () => {
         const result = await window.db['franchise:update'](teamID, season);
         franchise.value = result as Franchise;
     }
+    async function setStatus(status: TeamStatus) {
+        const result = await window.db['franchise:setStatus'](status);
+        franchise.value = result as Franchise;
+    }
 
     return {
         franchise, teams,
         currentTeam, formattedSeason,
-        load, loadTeams, update,
+        load, loadTeams, update, setStatus,
     };
 });
 
@@ -159,7 +167,8 @@ export const usePickStore = defineStore('picks', () => {
         const result = await window.db['pick:getAll']();
         picks.value = result as Pick[];
     }
-    async function add(pick: Omit<Pick, 'id'>) {
+    // Projection fields default in the DB (unset, unlocked)
+    async function add(pick: Omit<Pick, 'id' | 'projected_pick' | 'locked'>) {
         const result = await window.db['pick:add'](pick);
         if (result) picks.value = [...picks.value, result as Pick];
         return result as Pick | null;
@@ -185,6 +194,10 @@ export const useScoutStore = defineStore('scouts', () => {
     const hired = computed(() => scouts.value.filter(s => s.status === 'hired'));
     const offered = computed(() => scouts.value.filter(s => s.status === 'offered'));
 
+    // Region a scout is working (null if unassigned or no scout)
+    const regionOf = (id: number | null | undefined) =>
+        scouts.value.find(s => s.id === id)?.region ?? null;
+
     async function load() {
         const result = await window.db['scout:getAll']();
         scouts.value = result as Scout[];
@@ -205,17 +218,28 @@ export const useScoutStore = defineStore('scouts', () => {
         scouts.value = scouts.value.filter(s => s.id !== id);
     }
 
-    return { scouts, hired, offered, load, add, update, remove };
+    return { scouts, hired, offered, regionOf, load, add, update, remove };
 });
 
 export const useScoutedPlayerStore = defineStore('scoutedPlayers', () => {
     const scoutedPlayers = ref<ScoutedPlayer[]>([]);
 
+    // A scout's shortlist: their prospects, best CS rank first (unranked last)
+    function forScout(scoutID: number) {
+        return scoutedPlayers.value
+            .filter(p => p.scout_id === scoutID)
+            .sort((a, b) =>
+                (a.cs_rank ?? Infinity) - (b.cs_rank ?? Infinity)
+                || a.last_name.localeCompare(b.last_name)
+            );
+    }
+
     async function load() {
         const result = await window.db['scoutedPlayer:getAll']();
         scoutedPlayers.value = result as ScoutedPlayer[];
     }
-    async function add(player: Omit<ScoutedPlayer, 'id'>) {
+    // Partial so shortlist quick-adds can omit the refinement fields (stored as null)
+    async function add(player: Partial<Omit<ScoutedPlayer, 'id'>>) {
         const result = await window.db['scoutedPlayer:add'](player) as ScoutedPlayer;
         scoutedPlayers.value = [...scoutedPlayers.value, result];
         return result;
@@ -231,5 +255,28 @@ export const useScoutedPlayerStore = defineStore('scoutedPlayers', () => {
         scoutedPlayers.value = scoutedPlayers.value.filter(p => p.id !== id);
     }
 
-    return { scoutedPlayers, load, add, update, remove };
+    return { scoutedPlayers, forScout, load, add, update, remove };
+});
+
+export const useTradeStore = defineStore('trades', () => {
+    const trades = ref<Trade[]>([]);
+
+    async function load() {
+        const result = await window.db['trade:getAll']();
+        trades.value = result as Trade[];
+    }
+    // Runs atomically in the main process; roster and picks change, so reload both
+    async function execute(request: TradeRequest) {
+        const result = await window.db['trade:execute'](request) as Trade;
+        trades.value = [result, ...trades.value];
+        await Promise.all([usePlayerStore().load(), usePickStore().load()]);
+        return result;
+    }
+    // Log entry only — doesn't undo the roster or pick changes
+    async function remove(id: number) {
+        await window.db['trade:delete'](id);
+        trades.value = trades.value.filter(t => t.id !== id);
+    }
+
+    return { trades, load, execute, remove };
 });

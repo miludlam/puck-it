@@ -13,6 +13,10 @@ const emit = defineEmits<{
         playerID: number,
         fromSlot: string | null
     ];
+    contextmenu: [
+        player: Player,
+        event: MouseEvent
+    ];
 }>();
 
 const isDragOver = ref(false);
@@ -56,6 +60,7 @@ function onDrop(event: DragEvent) {
             :key="player.id"
             :player="player"
             :fromSlot="null"
+            @contextmenu.prevent="emit('contextmenu', player, $event)"
         />
     </div>
 </template>

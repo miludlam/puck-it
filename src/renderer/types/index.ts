@@ -74,6 +74,7 @@ export interface Player {
     notes: string | null;
     line_slot: string | null;
     line_league: LineLeague | null;
+    on_block: number; // 1 = manually placed on the trade block
     created_at: string;
 }
 
@@ -91,11 +92,81 @@ export interface Team {
     colors: TeamColors;
 }
 
+// Team direction — drives what the Trade Block shops and asks for
+export type TeamStatus = 'Contender' | 'Bubble' | 'Rebuild';
+
 export interface Franchise {
     id: number;
     team_id: string | null;
     season: number;
+    team_status: TeamStatus;
     created_at: string;
+}
+
+// Trade history: each asset is a snapshot at the time of the trade
+export interface TradePlayerSnapshot {
+    first_name: string;
+    last_name: string;
+    position: Position;
+    position2: Position | null;
+    age: number;
+    roster_league: League;
+    overall: number;
+    potential_level: PotentialLevel | '';
+    potential_chance: PotentialChance | '';
+    player_type: PlayerType | '';
+    aav: number;
+    years_remaining: number;
+    contract_type: ContractType | null;
+    clause: Clause | null;
+}
+
+export type TradeAsset = { direction: 'out' | 'in' } & (
+    | { kind: 'player'; player: TradePlayerSnapshot }
+    | {
+        kind: 'pick';
+        year: number;
+        round: number;
+        original_owner: string; // team the pick originally belonged to
+        from_owner: string;     // who held it going into the trade
+        to_owner: string;
+    }
+);
+
+export interface Trade {
+    id: number;
+    season: number;
+    partner: string; // team ID
+    assets: TradeAsset[];
+    notes: string | null;
+    created_at: string;
+}
+
+// Incoming player as entered on the trade form (missing fields default in the DB).
+// Spelled out because the draft `Pick` interface shadows TypeScript's Pick utility here.
+export interface IncomingPlayer {
+    first_name: string;
+    last_name: string;
+    position: Position;
+    age: number;
+    roster_league: League;
+    overall: number;
+    aav: number;
+    years_remaining: number;
+    potential_level?: PotentialLevel;
+    potential_chance?: PotentialChance;
+    player_type?: PlayerType;
+    contract_type?: ContractType | null;
+    clause?: Clause | null;
+}
+
+export interface TradeRequest {
+    partner: string;
+    notes: string | null;
+    outPlayerIds: number[];
+    outPickIds: number[];
+    inPlayers: IncomingPlayer[];
+    inPicks: { year: number; round: number; original_owner: string }[];
 }
 
 // Pick
@@ -106,6 +177,8 @@ export interface Pick {
     original_owner: string;  // team ID
     current_owner: string;   // team ID
     notes: string | null;
+    projected_pick: number | null; // overall pick number, projected from standings
+    locked: boolean;               // pick position finalized
 }
 
 // Scout
@@ -120,25 +193,49 @@ export interface Scout {
     region: JuniorLeague | null;
     region_locked: boolean;
     status: ScoutStatus;
+    assignment_end: string | null; // 'MM-DD' the shortlist assignment ends (years are irrelevant)
 }
 
-// Scouted Player
+// Scouted Player (board prospect). A scout's shortlist is the prospects with their
+// scout_id. Shortlist quick-adds leave the quality fields null until refined on the board.
 export interface ScoutedPlayer {
     id: number;
     first_name: string;
     last_name: string;
-    position: Position;
+    position: Position | null;
     position2: Position | null;
-    age: number;
+    age: number | null;
     junior_league: JuniorLeague | null;
+    cs_rank: number | null; // Central Scouting rank ≈ projected pick
+    overall: number | null;
+    potential_level: PotentialLevel | null;
+    potential_chance: PotentialChance | null;
+    player_type: PlayerType | null;
+    nhl_readiness: NHLReadiness | null;
+    scout_id: number | null;
+    notes: string | null;
+    gem_bust: GemBust | null; // revealed by scouting; stays on the draft screen
+}
+
+export type GemBust = 'Gem' | 'Bust';
+
+// A prospect with every field the draft needs filled in
+export type RefinedScoutedPlayer = ScoutedPlayer & {
+    position: Position;
+    age: number;
     overall: number;
     potential_level: PotentialLevel;
     potential_chance: PotentialChance;
     player_type: PlayerType;
-    nhl_readiness: NHLReadiness | null;
-    scout_id: number | null;
-    notes: string | null;
+};
+
+export function isRefined(p: ScoutedPlayer): p is RefinedScoutedPlayer {
+    return p.position !== null && p.age !== null && p.overall !== null
+        && p.potential_level !== null && p.potential_chance !== null && p.player_type !== null;
 }
+
+// Max prospects on one scout's shortlist (mirrors the main-process check)
+export const SHORTLIST_MAX = 50;
 
 declare global {
     interface Window {

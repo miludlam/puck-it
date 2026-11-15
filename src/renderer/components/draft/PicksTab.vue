@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { usePickStore, useFranchiseStore } from '@/stores';
 import { Pick, DraftRound } from '@/types';
 import PickModal from '@/components/draft/PickModal.vue';
+import DraftPlanner from '@/components/draft/DraftPlanner.vue';
 
 const pickStore = usePickStore();
 const franchiseStore = useFranchiseStore();
@@ -79,6 +80,8 @@ function teamColor(id: string): string {
 
 <template>
     <div class="space-y-8">
+        <DraftPlanner />
+
         <!-- Header row -->
         <div class="flex items-center justify-between">
             <h2 class="text-sm font-medium text-slate-400 uppercase tracking-wider">Pick Inventory</h2>

@@ -4,8 +4,9 @@ import PicksTab from '@/components/draft/PicksTab.vue';
 import PipelineTab from '@/components/draft/PipelineTab.vue';
 import BoardTab from '@/components/draft/BoardTab.vue';
 import ScoutsTab from '@/components/draft/ScoutsTab.vue';
+import ShortlistsTab from '@/components/draft/ShortlistsTab.vue';
 
-type DraftTab = 'picks' | 'pipeline' | 'board' | 'scouts';
+type DraftTab = 'picks' | 'pipeline' | 'board' | 'scouts' | 'shortlists';
 const activeTab = ref<DraftTab>('picks');
 
 const tabs: { key: DraftTab; label: string }[] = [
@@ -13,6 +14,7 @@ const tabs: { key: DraftTab; label: string }[] = [
     { key: 'pipeline', label: 'Pipeline' },
     { key: 'board',    label: 'Board'    },
     { key: 'scouts',   label: 'Scouts'   },
+    { key: 'shortlists', label: 'Shortlists' },
 ];
 </script>
 
@@ -36,5 +38,6 @@ const tabs: { key: DraftTab; label: string }[] = [
         <PipelineTab v-else-if="activeTab === 'pipeline'" />
         <BoardTab    v-else-if="activeTab === 'board'"    />
         <ScoutsTab   v-else-if="activeTab === 'scouts'"   />
+        <ShortlistsTab v-else-if="activeTab === 'shortlists'" />
     </div>
 </template>

@@ -60,7 +60,7 @@ const emit = defineEmits<{
 
 const showDeleteConfirm = ref(false);
 
-const form = reactive<Omit<Player, 'id' | 'created_at'>>({
+const form = reactive<Omit<Player, 'id' | 'created_at' | 'on_block'>>({
     first_name: '',
     last_name: '',
     position: 'C',

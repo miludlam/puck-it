@@ -40,10 +40,16 @@ function onDragStart(event: DragEvent) {
             {{ props.player.position }}{{ props.player.position2 ? `/${props.player.position2}` : '' }}
         </span>
 
-        <!-- Name -->
-        <span class="text-sm text-slate-200 flex-1 truncate">
-            {{ props.player.first_name.charAt(0) }}. {{ props.player.last_name }}
-        </span>
+        <!-- Name, with age and potential beneath -->
+        <div class="flex-1 min-w-0 leading-tight">
+            <p class="text-sm text-slate-200 truncate">
+                {{ props.player.first_name.charAt(0) }}. {{ props.player.last_name }}
+            </p>
+            <p class="text-[10px] text-slate-500 truncate">
+                {{ props.player.age }} · {{ props.player.potential_level }}
+                <span class="text-slate-600">({{ props.player.potential_chance }})</span>
+            </p>
+        </div>
 
         <!-- Player type -->
         <span class="text-xs text-slate-500 flex-shrink-0">

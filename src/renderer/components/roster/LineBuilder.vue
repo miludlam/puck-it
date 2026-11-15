@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { LineLeague, Player } from "@/types";
+import { LineLeague, Player, Position } from "@/types";
 import { usePlayerStore } from '@/stores';
 import LineBuilderLines from './LineBuilderLines.vue';
 import LineBuilderPool from './LineBuilderPool.vue';
 import LineBuilderScratches from "./LineBuilderScratches.vue";
+import ContextMenu, { ContextMenuItem } from '@/components/ContextMenu.vue';
 
 const playerStore = usePlayerStore();
 
@@ -36,6 +37,47 @@ const nhlSlottedCount = computed(() =>
         ? playerStore.players.filter(p => p.line_slot !== null && p.line_league === 'NHL').length
         : null
 );
+
+// Slot keys in line order — mirrors the layouts in LineBuilderLines / LineBuilderScratches
+function slotsFor(position: Position): string[] {
+    const l = props.league;
+    if (position === 'G') return [`${l}-G1`, `${l}-G2`];
+    if (position === 'LD' || position === 'RD') return [1, 2, 3].map(n => `${l}-D${n}-${position}`);
+    return [1, 2, 3, 4].map(n => `${l}-F${n}-${position}`);
+}
+const scratchSlots = computed(() =>
+    props.league === 'NHL' ? [1, 2, 3].map(n => `${props.league}-S${n}`) : []
+);
+
+const firstOpen = (slots: string[]) => slots.find(s => !slotMap.value[s]) ?? null;
+
+// Right-click menu for pool players
+const menu = ref<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+
+function openPoolMenu(player: Player, event: MouseEvent) {
+    const positions = [player.position, player.position2].filter((p): p is Position => !!p);
+    const items: ContextMenuItem[] = positions.map(position => {
+        const slot = firstOpen(slotsFor(position));
+        return {
+            label: `Slot as ${position}`,
+            disabled: !slot,
+            hint: slot ? undefined : 'full',
+            action: () => handleDrop(player.id, null, slot),
+        };
+    });
+
+    if (scratchSlots.value.length) {
+        const slot = firstOpen(scratchSlots.value);
+        items.push({
+            label: 'Scratch player',
+            disabled: !slot,
+            hint: slot ? undefined : 'full',
+            action: () => handleDrop(player.id, null, slot),
+        });
+    }
+
+    menu.value = { x: event.clientX, y: event.clientY, items };
+}
 
 async function handleDrop(playerID: number, fromSlot: string | null, toSlot: string | null) {
     const player = playerStore.players.find(p => p.id === playerID);
@@ -103,10 +145,18 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
                     :players="poolPlayers"
                     :league="league"
                     @drop="(playerID, fromSlot) => handleDrop(playerID, fromSlot, null)"
+                    @contextmenu="openPoolMenu"
                 />
             </div>
 
         </div>
+        <ContextMenu
+            v-if="menu"
+            :x="menu.x"
+            :y="menu.y"
+            :items="menu.items"
+            @close="menu = null"
+        />
         <!-- Confirmation -->
         <div v-if="confirmClear" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
             <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 w-80">

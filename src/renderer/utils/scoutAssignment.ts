@@ -1,5 +1,21 @@
 import { JuniorLeague, Scout, ScoutRating } from '@/types';
 
+// Target number of scouts per region (also each region's priority, highest first)
+export const ALLOTMENT: Partial<Record<JuniorLeague, number>> = {
+    'OHL':        3,
+    'QMJHL':      2,
+    'WHL':        2,
+    'US Central': 2,
+    'Russia':     2,
+    'SHL':        2,
+    'Liiga':      2,
+    'US West':    1,
+    'US East':    1,
+    'Extraliga':  1,
+    'NLA':        1,
+    'DEL':        1,
+};
+
 // Rank a letter rating numerically (higher = better, unrated = 0)
 const ratingValue: Record<ScoutRating, number> = {
     'A+': 13, 'A': 12, 'A-': 11,

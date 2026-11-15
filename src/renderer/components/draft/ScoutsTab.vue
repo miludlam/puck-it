@@ -1,34 +1,24 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useScoutStore } from '@/stores';
-import { JuniorLeague, Scout, ScoutRating, ScoutStatus } from '@/types';
+import { useScoutedPlayerStore, useScoutStore } from '@/stores';
+import { JuniorLeague, Scout, ScoutRating, ScoutStatus, SHORTLIST_MAX } from '@/types';
 import ScoutModal from '@/components/draft/ScoutModal.vue';
+import ShortlistPlayerModal from '@/components/draft/ShortlistPlayerModal.vue';
 import LockIcon from '@/components/LockIcon.vue';
-import { autoAssignScouts, suggestLockedMoves } from '@/utils/scoutAssignment';
+import ScoutPhases from '@/components/draft/ScoutPhases.vue';
+import { ALLOTMENT, autoAssignScouts, suggestLockedMoves } from '@/utils/scoutAssignment';
 
 const scoutStore = useScoutStore();
+const scoutedStore = useScoutedPlayerStore();
+
+// Shortlist quick add (undefined = closed, null = no scout preselected)
+const shortlistScoutId = ref<number | null | undefined>(undefined);
 
 const showModal = ref(false);
 const selectedScout = ref<Scout | undefined>(undefined);
 
 const MAX_SCOUTS = 20;
 const canAdd = computed(() => scoutStore.hired.length < MAX_SCOUTS);
-
-// Target allotment per region
-const ALLOTMENT: Partial<Record<JuniorLeague, number>> = {
-    'OHL':        3,
-    'QMJHL':      2,
-    'WHL':        2,
-    'US Central': 2,
-    'Russia':     2,
-    'SHL':        2,
-    'Liiga':      2,
-    'US West':    1,
-    'US East':    1,
-    'Extraliga':  1,
-    'NLA':        1,
-    'DEL':        1,
-};
 
 const allotmentRegions = Object.keys(ALLOTMENT) as JuniorLeague[];
 
@@ -330,6 +320,11 @@ const offloadSuggestions = computed(() =>
                     @click="autoAssign"
                 >Auto-assign</button>
                 <button
+                    v-if="scoutStore.hired.length"
+                    class="px-4 py-2 rounded-lg text-sm font-medium border border-sky-500/40 text-sky-300 hover:bg-sky-500/10 transition-colors"
+                    @click="shortlistScoutId = null"
+                >+ Shortlist Player</button>
+                <button
                     class="px-4 py-2 rounded-lg text-sm font-medium border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
                     @click="openAdd('offered')"
                 >+ Offer Contract</button>
@@ -340,6 +335,8 @@ const offloadSuggestions = computed(() =>
                 >+ Add Scout</button>
             </div>
         </div>
+
+        <ScoutPhases />
 
         <!-- Allotment overview -->
         <div>
@@ -748,9 +745,21 @@ const offloadSuggestions = computed(() =>
                             <span :class="['font-medium', ratingColor[rating!] ?? 'text-slate-300']">{{ rating }}</span>
                         </span>
                     </div>
+                    <button
+                        class="ml-auto flex-shrink-0 px-2 py-0.5 rounded text-xs text-slate-500 hover:text-sky-300 hover:bg-sky-500/10 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+                        :disabled="scoutedStore.forScout(scout.id).length >= SHORTLIST_MAX"
+                        title="Add a player to this scout's shortlist"
+                        @click.stop="shortlistScoutId = scout.id"
+                    >+ Shortlist {{ scoutedStore.forScout(scout.id).length }}/{{ SHORTLIST_MAX }}</button>
                 </div>
             </div>
         </div>
+
+        <ShortlistPlayerModal
+            v-if="shortlistScoutId !== undefined"
+            :scout-id="shortlistScoutId ?? undefined"
+            @close="shortlistScoutId = undefined"
+        />
 
         <ScoutModal v-if="showModal" :scout="selectedScout" :status="newScoutStatus" @close="onClose" @saved="onClose" />
     </div>

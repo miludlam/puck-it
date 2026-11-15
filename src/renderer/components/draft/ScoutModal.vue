@@ -30,6 +30,7 @@ const form = reactive({
     region: props.scout?.region ?? null as JuniorLeague | null,
     region_locked: props.scout?.region_locked ?? false,
     status: props.scout?.status ?? props.status ?? 'hired' as ScoutStatus,
+    assignment_end: props.scout?.assignment_end ?? null,
     region_ratings: { ...(props.scout?.region_ratings ?? {}) } as Partial<Record<JuniorLeague, ScoutRating>>,
 });
 
