@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import { initDB, dbHandlers } from './db';
+import { closeDB, dbHandlers } from './db';
+import { libraryHandlers, openLibrary } from './library';
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -44,9 +45,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-    initDB();
+    const openError = openLibrary();
+    if (openError) dialog.showErrorBox('Franchise not opened', openError);
 
-    for (const [channel, handler] of Object.entries(dbHandlers)) {
+    for (const [channel, handler] of Object.entries({ ...dbHandlers, ...libraryHandlers })) {
         ipcMain.handle(channel, handler);
     }
 
@@ -62,6 +64,9 @@ app.whenReady().then(() => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
 });
+
+// Closing folds the write-ahead log back into the franchise file
+app.on('will-quit', () => closeDB());
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

@@ -3,7 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 // IPC channels will be registered here as features are built.
 const channels = [
     'player:getAll', 'player:add', 'player:update', 'player:delete', 'player:assignSlot', 'player:clearAll',
-    'franchise:get', 'franchise:update', 'franchise:advanceSeason', 'franchise:setStatus',
+    'franchise:get', 'franchise:update', 'franchise:advanceSeason', 'franchise:setStatus', 'franchise:rename',
+    'library:list', 'library:create', 'library:open', 'library:delete', 'library:export', 'library:import',
     'teams:get',
     'pick:getAll', 'pick:getMy', 'pick:getTraded', 'pick:getAcquired',
     'pick:add', 'pick:update', 'pick:delete',

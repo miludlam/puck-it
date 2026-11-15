@@ -144,11 +144,15 @@ export const useFranchiseStore = defineStore('franchise', () => {
         const result = await window.db['franchise:setStatus'](status);
         franchise.value = result as Franchise;
     }
+    async function rename(name: string | null) {
+        const result = await window.db['franchise:rename'](name);
+        franchise.value = result as Franchise;
+    }
 
     return {
         franchise, teams,
         currentTeam, formattedSeason,
-        load, loadTeams, update, setStatus,
+        load, loadTeams, update, setStatus, rename,
     };
 });
 

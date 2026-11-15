@@ -97,10 +97,23 @@ export type TeamStatus = 'Contender' | 'Bubble' | 'Rebuild';
 
 export interface Franchise {
     id: number;
+    name: string | null; // null = shown as the team name
     team_id: string | null;
     season: number;
     team_status: TeamStatus;
     created_at: string;
+}
+
+// A franchise file in the app's library (mirrors src/main/library.ts)
+export interface FranchiseFile {
+    file: string;
+    name: string | null;
+    team_id: string | null;
+    season: number | null;
+    modified: string;
+    current: boolean;
+    newer: boolean;      // saved by a newer app version
+    unreadable: boolean;
 }
 
 // Trade history: each asset is a snapshot at the time of the trade

@@ -6,6 +6,7 @@ const franchiseStore = useFranchiseStore();
 
 const season = ref<number>(franchiseStore.franchise?.season ?? 25);
 const selectedTeamID = ref<string | null>(franchiseStore.franchise?.team_id ?? null);
+const name = ref(franchiseStore.franchise?.name ?? '');
 
 // CSS constants
 const inputClass = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500";
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 async function save() {
     if (selectedTeamID.value && season.value) {
         await franchiseStore.update(selectedTeamID.value, season.value);
+        if ((name.value.trim() || null) !== franchiseStore.franchise?.name) await franchiseStore.rename(name.value);
         emit('close');
     }
 }
@@ -38,8 +40,17 @@ async function save() {
             </div>
             <!-- Group 1: Team & Season -->
             <div>
-                <h3 :class="formGroupHeader">Team & Season</h3>
+                <h3 :class="formGroupHeader">Franchise</h3>
                 <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                        <label class="block text-xs text-slate-400 mb-1">Franchise name</label>
+                        <input
+                            v-model="name"
+                            type="text"
+                            :placeholder="franchiseStore.teams.find(t => t.id === selectedTeamID)?.name ?? 'Optional'"
+                            :class="inputClass"
+                        />
+                    </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Team</label>
                         <select v-model="selectedTeamID" :class="inputClass">

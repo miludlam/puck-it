@@ -1,15 +1,60 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
-import { app } from 'electron';
 
 let db: Database.Database;
 
-export function initDB() {
-    const dbPath = path.join(app.getPath('userData'), 'puck-it.db');
-    db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    createSchema();
+// Schema versions, stored in each franchise file's user_version. Opening a file runs the
+// steps it hasn't had yet, in order. A released step is never edited: changes go in a new one.
+const MIGRATIONS: (() => void)[] = [
+    baselineSchema, // 1: everything before the franchise library; its checks catch older files up
+    () => db.exec("ALTER TABLE franchise ADD COLUMN name TEXT DEFAULT NULL"), // 2: franchise names
+];
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
+export class NewerFileError extends Error {}
+
+/** Switch to a franchise file, updating it first. On failure the previous file stays open. */
+export function openDB(file: string, backupDir: string) {
+    const prev = db;
+    db = new Database(file);
+    try {
+        const version = db.pragma('user_version', { simple: true }) as number;
+        if (version > SCHEMA_VERSION)
+            throw new NewerFileError('This franchise was saved by a newer version of Puck It. Update the app to open it.');
+        db.pragma('journal_mode = WAL');
+        migrate(file, version, backupDir);
+        db.pragma('foreign_keys = ON');
+        normalizeData();
+    } catch (e) {
+        db.close();
+        db = prev;
+        throw e;
+    }
+    prev?.close();
+}
+
+export function closeDB() {
+    db?.close();
+}
+
+function migrate(file: string, version: number, backupDir: string) {
+    if (version === SCHEMA_VERSION) return;
+
+    // Keep a copy of a file that has data in it, in case an update goes wrong
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table'").get()) {
+        fs.mkdirSync(backupDir, { recursive: true });
+        const name = `${path.basename(file, '.db')}.v${version}.${Date.now()}.db`;
+        db.prepare('VACUUM INTO ?').run(path.join(backupDir, name));
+    }
+
+    // Table rebuilds need foreign keys off, which only takes effect outside a transaction.
+    // All steps commit together or not at all.
+    db.pragma('foreign_keys = OFF');
+    db.transaction(() => {
+        for (let v = version; v < SCHEMA_VERSION; v++) MIGRATIONS[v]();
+        db.pragma(`user_version = ${SCHEMA_VERSION}`);
+    })();
 }
 
 // Helper method that adds the next year's default draft picks on season advance
@@ -46,7 +91,7 @@ function mapScout(row: Record<string, unknown>) {
     };
 }
 
-function createSchema() {
+function baselineSchema() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS players (
             id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -239,7 +284,10 @@ function createSchema() {
         db.exec("ALTER TABLE scouted_players ADD COLUMN original_cs_rank INTEGER DEFAULT NULL");
         db.exec("UPDATE scouted_players SET original_cs_rank = cs_rank");
     }
+}
 
+// Data fix-ups that run every time a file is opened
+function normalizeData() {
     // Prospects with no league default to the region their scout is working
     db.exec(`
         UPDATE scouted_players
@@ -282,41 +330,33 @@ function migrateScoutedPlayers() {
     ).get();
     if (cols.includes('cs_rank') && !hasShortlistTable) return;
 
-    // SQLite can't relax NOT NULL in place, so rebuild the table. FK checks must be
-    // toggled outside the transaction.
-    db.pragma('foreign_keys = OFF');
-    try {
-        db.transaction(() => {
-            if (!cols.includes('cs_rank')) {
-                db.exec(SCOUTED_PLAYERS_SCHEMA('scouted_players_new'));
-                db.exec(`
-                    INSERT INTO scouted_players_new (
-                        id, first_name, last_name, position, position2, age, junior_league,
-                        overall, potential_level, potential_chance, player_type,
-                        nhl_readiness, scout_id, notes
-                    )
-                    SELECT
-                        id, first_name, last_name, position, position2, age, junior_league,
-                        overall, NULLIF(potential_level, ''), potential_chance, NULLIF(player_type, ''),
-                        nhl_readiness, scout_id, notes
-                    FROM scouted_players;
-                    DROP TABLE scouted_players;
-                    ALTER TABLE scouted_players_new RENAME TO scouted_players;
-                `);
-            }
-            // Fold the interim shortlist table into prospects
-            if (hasShortlistTable) {
-                db.exec(`
-                    INSERT INTO scouted_players (first_name, last_name, age, position, cs_rank, scout_id)
-                    SELECT first_name, last_name, age, position, cs_rank, scout_id
-                    FROM scout_shortlist
-                    WHERE scouted_player_id IS NULL;
-                    DROP TABLE scout_shortlist;
-                `);
-            }
-        })();
-    } finally {
-        db.pragma('foreign_keys = ON');
+    // SQLite can't relax NOT NULL in place, so rebuild the table (migrate() has FK checks off)
+    if (!cols.includes('cs_rank')) {
+        db.exec(SCOUTED_PLAYERS_SCHEMA('scouted_players_new'));
+        db.exec(`
+            INSERT INTO scouted_players_new (
+                id, first_name, last_name, position, position2, age, junior_league,
+                overall, potential_level, potential_chance, player_type,
+                nhl_readiness, scout_id, notes
+            )
+            SELECT
+                id, first_name, last_name, position, position2, age, junior_league,
+                overall, NULLIF(potential_level, ''), potential_chance, NULLIF(player_type, ''),
+                nhl_readiness, scout_id, notes
+            FROM scouted_players;
+            DROP TABLE scouted_players;
+            ALTER TABLE scouted_players_new RENAME TO scouted_players;
+        `);
+    }
+    // Fold the interim shortlist table into prospects
+    if (hasShortlistTable) {
+        db.exec(`
+            INSERT INTO scouted_players (first_name, last_name, age, position, cs_rank, scout_id)
+            SELECT first_name, last_name, age, position, cs_rank, scout_id
+            FROM scout_shortlist
+            WHERE scouted_player_id IS NULL;
+            DROP TABLE scout_shortlist;
+        `);
     }
 }
 
@@ -425,6 +465,12 @@ function updateFranchise(teamID: string, season: number) {
 
 function setTeamStatus(status: string) {
     db.prepare('UPDATE franchise SET team_status = ? WHERE id = 1').run(status);
+    return getFranchise();
+}
+
+// Blank clears the name; the franchise list then shows the team instead
+function renameFranchise(name: string | null) {
+    db.prepare('UPDATE franchise SET name = ? WHERE id = 1').run(name?.trim() || null);
     return getFranchise();
 }
 
@@ -996,6 +1042,7 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'franchise:get': () => getFranchise(),
     'franchise:update': (_: null, teamID: string, season: number) => updateFranchise(teamID, season),
     'franchise:setStatus': (_: null, status: string) => setTeamStatus(status),
+    'franchise:rename': (_: null, name: string | null) => renameFranchise(name),
     'franchise:advanceSeason': () => advanceSeason(),
     'pick:getAll': () => getAllPicks(),
     'pick:getMy': (_: null, teamID: string) => getMyPicks(teamID),
