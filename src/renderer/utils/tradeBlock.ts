@@ -2,18 +2,20 @@ import { Pick, Player, Position, TeamStatus } from '@/types';
 import { analyzeRoster } from '@/utils/draftTargets';
 
 // NHL lineup slots per position (12F / 6D / 2G); one extra per position is normal depth
-const NHL_SLOTS: Record<Position, number> = { C: 4, LW: 4, RW: 4, LD: 3, RD: 3, G: 2 };
+export const NHL_SLOTS: Record<Position, number> = { C: 4, LW: 4, RW: 4, LD: 3, RD: 3, G: 2 };
 const POSITIONS = Object.keys(NHL_SLOTS) as Position[];
 
 const VETERAN_AGE = 30;
 const SELL_AGE = 28; // rebuilding teams shop players this age and up on short deals
 
+// Organizational depth at one position, each league best first
 export interface DepthRow {
     position: Position;
     slots: number;
-    nhl: number;
-    ahlReady: number; // AHL players at least as good as the weakest NHL player there
-    state: 'surplus' | 'short' | 'ok';
+    nhl: Player[];
+    ahl: Player[];
+    its: Player[];
+    state: 'surplus' | 'short' | 'ok'; // judged on the NHL lineup
 }
 
 export interface BlockCandidate {
@@ -52,15 +54,21 @@ export function evaluateTradeBlock(
 ): TradeBlockReport {
     const nhl = players.filter(p => p.roster_league === 'NHL');
     const ahl = players.filter(p => p.roster_league === 'AHL');
+    const its = players.filter(p => p.roster_league === 'ITS');
 
-    // Positional depth against the NHL lineup
+    // Positional depth across the organization; surplus/short against the NHL lineup
+    const atPosition = (group: Player[], position: Position) =>
+        group.filter(p => p.position === position).sort((a, b) => b.overall - a.overall);
     const depth: DepthRow[] = POSITIONS.map(position => {
-        const atPos = nhl.filter(p => p.position === position);
-        const floor = atPos.length ? Math.min(...atPos.map(p => p.overall)) : 0;
-        const ahlReady = ahl.filter(p => p.position === position && p.overall >= floor && floor > 0).length;
-        const slots = NHL_SLOTS[position];
-        const state = atPos.length > slots + 1 ? 'surplus' : atPos.length + ahlReady < slots ? 'short' : 'ok';
-        return { position, slots, nhl: atPos.length, ahlReady, state };
+        const row = {
+            position,
+            slots: NHL_SLOTS[position],
+            nhl: atPosition(nhl, position),
+            ahl: atPosition(ahl, position),
+            its: atPosition(its, position),
+        };
+        const state = row.nhl.length > row.slots + 1 ? 'surplus' : row.nhl.length < row.slots ? 'short' : 'ok';
+        return { ...row, state };
     });
 
     const short = depth.filter(d => d.state === 'short').map(d => d.position);

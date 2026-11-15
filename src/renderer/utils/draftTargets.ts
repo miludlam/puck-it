@@ -21,7 +21,7 @@ const TIER_VALUE = [10, 9, 7, 5, 3, 1, 1, 1, 1, 1];
 const CHANCE_FACTOR: Record<PotentialChance, number> = { Exact: 1, High: 0.9, Med: 0.75, Low: 0.55 };
 
 // Is this an NHL-calibre potential (top three tiers below Franchise/Elite included)?
-const isNhlPotential = (group: Group, level: PotentialLevel | '' | null) =>
+export const isNhlPotential = (group: Group, level: PotentialLevel | '' | null) =>
     !!level && POTENTIAL_TIERS[group].indexOf(level) !== -1 && POTENTIAL_TIERS[group].indexOf(level) <= 3;
 
 // Desired share of each player type within a group. Creativity and finishing (PLY/SNP)
@@ -32,14 +32,14 @@ const TYPE_MIX: Record<Group, Partial<Record<PlayerType, number>>> = {
     G:   {},
 };
 
-const TYPE_NAMES: Partial<Record<PlayerType, string>> = {
+export const TYPE_NAMES: Partial<Record<PlayerType, string>> = {
     PLY: 'playmakers', SNP: 'snipers', PWF: 'power forwards', TWF: 'two-way forwards',
     GRN: 'grinders', ENF: 'enforcers', OFD: 'offensive D', TWD: 'two-way D', DFD: 'defensive D',
 };
 
 // Young players with real potential at a position, the "pipeline" we want behind the NHL group
 const PIPELINE_AGE = 23;
-const PIPELINE_TARGET: Record<Position, number> = { C: 2, LW: 2, RW: 2, LD: 2, RD: 2, G: 1 };
+export const PIPELINE_TARGET: Record<Position, number> = { C: 2, LW: 2, RW: 2, LD: 2, RD: 2, G: 1 };
 const AGING_AGE = 30;
 
 export interface PositionNeed {

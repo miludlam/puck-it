@@ -14,6 +14,7 @@ const emit = defineEmits<{
         playerID: number,
         fromSlot: string | null
     ];
+    contextmenu: [player: Player, event: MouseEvent];
 }>();
 
 const isDragOver = ref(false);
@@ -70,6 +71,7 @@ function isValidDrop(positionGroup: string): boolean {
             :player="props.player"
             :fromSlot="props.slotKey"
             class="w-full"
+            @contextmenu.prevent="emit('contextmenu', props.player, $event)"
         />
 
         <!-- Empty -->

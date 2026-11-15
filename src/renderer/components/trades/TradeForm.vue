@@ -7,6 +7,8 @@ import {
 } from '@/types';
 import { groupOf, POTENTIAL_TIERS } from '@/utils/draftTargets';
 import { CAP_CEILING, formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
+import { evaluateTradeBlock } from '@/utils/tradeBlock';
+import { analyzeTrade, Verdict } from '@/utils/tradeAnalysis';
 
 const props = defineProps<{ initialPlayerIds: number[]; initialPickIds: number[] }>();
 const emit = defineEmits<{ executed: [] }>();
@@ -53,23 +55,51 @@ const toggled = (set: Set<number>, id: number) => {
 const togglePlayer = (id: number) => { outPlayerIds.value = toggled(outPlayerIds.value, id); };
 const togglePick = (id: number) => { outPickIds.value = toggled(outPickIds.value, id); };
 
-const search = ref('');
-const rosterByLeague = computed(() => {
-    const q = search.value.trim().toLowerCase();
-    const match = (p: Player) => !q || `${p.first_name} ${p.last_name}`.toLowerCase().includes(q);
-    return leagues.map(league => ({
-        league,
-        players: playerStore.players
-            .filter(p => p.roster_league === league && match(p))
-            .sort((a, b) => b.overall - a.overall),
-    })).filter(g => g.players.length);
-});
-
 const myPicks = computed(() =>
     pickStore.picks
         .filter(p => p.current_owner === myTeam.value)
         .sort((a, b) => normalizeYear(a.year) - normalizeYear(b.year) || a.round - b.round)
 );
+
+// Players kept on the block from the Trade Block tab, keyed by id → reasons (hover text)
+const blockReasons = computed(() => {
+    const report = evaluateTradeBlock(
+        playerStore.players,
+        franchiseStore.franchise?.team_status ?? 'Bubble',
+        CAP_CEILING - playerStore.nhlCapHit,
+        myPicks.value,
+        draftYear.value,
+    );
+    return new Map(report.candidates.filter(c => c.manual).map(c => [c.player.id, c.reasons]));
+});
+
+// Block players first, then the rest of the roster by league
+const search = ref('');
+const rosterGroups = computed(() => {
+    const q = search.value.trim().toLowerCase();
+    const match = (p: Player) => !q || `${p.first_name} ${p.last_name}`.toLowerCase().includes(q);
+    const byOverall = (a: Player, b: Player) => b.overall - a.overall;
+    const onBlock = playerStore.players.filter(p => blockReasons.value.has(p.id) && match(p));
+    const rest = playerStore.players.filter(p => !blockReasons.value.has(p.id) && match(p));
+    return [
+        { label: 'On the Block', block: true, players: onBlock.sort(byOverall) },
+        ...leagues.map(league => ({
+            label: league,
+            block: false,
+            players: rest.filter(p => p.roster_league === league).sort(byOverall),
+        })),
+    ].filter(g => g.players.length);
+});
+
+// Pick cards grouped by draft year, rounds in order
+const picksByYear = computed(() => {
+    const years = new Map<number, Pick[]>();
+    for (const p of myPicks.value) {
+        const year = normalizeYear(p.year);
+        years.set(year, [...(years.get(year) ?? []), p]);
+    }
+    return [...years].map(([year, picks]) => ({ year, picks }));
+});
 const pickLabel = (p: Pick) =>
     `${normalizeYear(p.year)} ${roundLabel(p.round)}${p.original_owner !== myTeam.value ? ` (via ${p.original_owner})` : ''}`;
 
@@ -117,6 +147,54 @@ const impact = computed(() => {
         + inPlayers.value.filter(p => p.roster_league === 'ITS' && hasContract(p)).length;
     return { capDelta: capIn - capOut, capHit, contracts, exempt };
 });
+
+/* ---------- Analysis ---------- */
+// Incoming rows shaped like roster players so the roster can be compared before and after
+const incomingAsPlayers = computed<Player[]>(() => inPlayers.value.map((p, i) => ({
+    ...p,
+    id: -(i + 1),
+    position2: null,
+    junior_league: null,
+    overall: Number(p.overall) || 0,
+    age: Number(p.age) || 0,
+    aav: Number(p.aav) || 0,
+    years_remaining: Number(p.years_remaining) || 0,
+    potential_level: p.potential_level as PotentialLevel,
+    potential_chance: p.potential_chance as PotentialChance,
+    player_type: p.player_type as PlayerType,
+    contract_type: p.contract_type ?? null,
+    clause: p.clause ?? null,
+    role: '',
+    waiver_eligible: 1,
+    status: 'Active',
+    notes: null,
+    line_slot: null,
+    line_league: null,
+    on_block: 0,
+    created_at: '',
+})));
+
+const analysis = computed(() => {
+    if (!outPlayerIds.value.size && !outPickIds.value.size && !inPlayers.value.length && !inPicks.value.length) return null;
+    return analyzeTrade({
+        players: playerStore.players,
+        outPlayerIds: outPlayerIds.value,
+        inPlayers: incomingAsPlayers.value,
+        outPicks: outPicks.value,
+        inPicks: inPicks.value,
+        blockIds: new Set(blockReasons.value.keys()),
+        status: franchiseStore.franchise?.team_status ?? 'Bubble',
+        capBefore: playerStore.nhlCapHit,
+        capAfter: impact.value.capHit,
+    });
+});
+
+const VERDICT_STYLE: Record<Verdict, { label: string; class: string }> = {
+    Good: { label: 'Good for the organization', class: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+    Mixed: { label: 'Mixed — weigh the trade-offs', class: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+    Poor: { label: 'Works against your needs', class: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
+    Neutral: { label: 'No real change to your needs', class: 'bg-slate-700/40 text-slate-300 border-slate-600' },
+};
 
 /* ---------- Validation & execute ---------- */
 const duplicateInPick = computed(() => {
@@ -199,6 +277,75 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
             </select>
         </div>
 
+        <!-- Impact + execute -->
+        <section class="p-4 bg-slate-800/30 border border-slate-700/50 rounded-lg space-y-3">
+            <div class="flex flex-wrap gap-x-8 gap-y-1 text-xs text-slate-400">
+                <span>
+                    NHL cap: {{ impact.capDelta >= 0 ? '+' : '−' }}{{ formatCap(Math.abs(impact.capDelta)) }}
+                    → <span :class="impact.capHit > CAP_CEILING ? 'text-rose-400' : 'text-slate-200'">{{ formatCap(impact.capHit) }}</span>
+                    / {{ formatCap(CAP_CEILING) }}
+                </span>
+                <span>Contracts: <span :class="impact.contracts > MAX_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.contracts }}</span> / {{ MAX_CONTRACTS }}</span>
+                <span>Exempt: <span :class="impact.exempt > MAX_EXEMPT_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.exempt }}</span> / {{ MAX_EXEMPT_CONTRACTS }}</span>
+            </div>
+            <!-- Analysis against organizational needs -->
+            <div v-if="analysis" class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="px-2 py-0.5 rounded border text-xs font-medium" :class="VERDICT_STYLE[analysis.verdict].class">
+                        {{ VERDICT_STYLE[analysis.verdict].label }}
+                    </span>
+                    <span class="text-[10px] text-slate-500">
+                        Judged as a {{ franchiseStore.franchise?.team_status ?? 'Bubble' }} team · doesn't price the other side
+                    </span>
+                </div>
+                <div v-if="analysis.resolves.length || analysis.creates.length" class="grid gap-3 sm:grid-cols-2 text-xs">
+                    <div>
+                        <p class="text-[10px] font-medium text-emerald-400/80 uppercase tracking-wider mb-1">Resolves</p>
+                        <ul class="space-y-0.5">
+                            <li v-for="e in analysis.resolves" :key="e.text" class="text-slate-300">+ {{ e.text }}</li>
+                            <li v-if="!analysis.resolves.length" class="text-slate-600">Nothing</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-medium text-rose-400/80 uppercase tracking-wider mb-1">Creates</p>
+                        <ul class="space-y-0.5">
+                            <li v-for="e in analysis.creates" :key="e.text" class="text-slate-300">− {{ e.text }}</li>
+                            <li v-if="!analysis.creates.length" class="text-slate-600">Nothing</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <ul v-if="warnings.length" class="text-xs text-amber-400 space-y-0.5">
+                <li v-for="w in warnings" :key="w">{{ w }}</li>
+            </ul>
+
+            <input v-model="notes" placeholder="Notes (optional) — e.g. deadline sell, retained salary" :class="[inputClass, 'w-full text-sm py-1.5']" />
+
+            <p v-if="error" class="text-xs text-rose-400">{{ error }}</p>
+            <div class="flex flex-wrap items-center gap-3">
+                <span v-if="problems.length" class="text-xs text-slate-500">{{ problems[0] }}</span>
+                <template v-if="confirming">
+                    <span class="ml-auto text-xs text-slate-300">
+                        Execute trade with {{ teamName(partner) }}? Roster and picks update immediately.
+                    </span>
+                    <button
+                        :disabled="executing"
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors"
+                        @click="execute"
+                    >Confirm</button>
+                    <button class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200" @click="confirming = false">Cancel</button>
+                </template>
+                <button
+                    v-else
+                    :disabled="problems.length > 0"
+                    class="ml-auto px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors hover:opacity-90 disabled:opacity-40"
+                    :style="{ backgroundColor: 'var(--team-primary)' }"
+                    @click="confirming = true"
+                >Execute trade</button>
+            </div>
+        </section>
+
         <div class="grid gap-6 lg:grid-cols-2">
             <!-- Sending -->
             <section class="space-y-4 p-4 bg-slate-800/30 border border-slate-700/50 rounded-lg">
@@ -237,8 +384,11 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
                     <p :class="sectionHeader">Players</p>
                     <input v-model="search" placeholder="Search roster…" :class="[inputClass, 'w-full mb-2']" />
                     <div class="max-h-72 overflow-y-auto space-y-3 pr-1">
-                        <div v-for="group in rosterByLeague" :key="group.league">
-                            <p class="text-[10px] font-medium text-slate-600 uppercase tracking-wider mb-1">{{ group.league }}</p>
+                        <div v-for="group in rosterGroups" :key="group.label">
+                            <p
+                                class="text-[10px] font-medium uppercase tracking-wider mb-1"
+                                :class="group.block ? 'text-amber-400/80' : 'text-slate-600'"
+                            >{{ group.label }}</p>
                             <label
                                 v-for="p in group.players"
                                 :key="p.id"
@@ -247,7 +397,10 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
                             >
                                 <input type="checkbox" class="accent-rose-500" :checked="outPlayerIds.has(p.id)" @change="togglePlayer(p.id)" />
                                 <span class="w-8 text-slate-500">{{ p.position }}</span>
-                                <span class="flex-1 truncate">{{ p.first_name }} {{ p.last_name }}</span>
+                                <span class="flex-1 truncate" :title="blockReasons.get(p.id)?.join('\n')">
+                                    {{ p.first_name }} {{ p.last_name }}
+                                    <span v-if="group.block" class="text-[10px] text-slate-500">{{ p.roster_league }}</span>
+                                </span>
                                 <span class="text-slate-500">{{ p.age }}</span>
                                 <span class="w-8 text-right text-slate-400">{{ p.overall }}</span>
                                 <span class="w-24 text-right text-slate-500">{{ p.aav > 0 ? `${formatCap(p.aav)}×${p.years_remaining}` : '—' }}</span>
@@ -259,15 +412,30 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
 
                 <div>
                     <p :class="sectionHeader">Picks</p>
-                    <div class="flex flex-wrap gap-1.5">
-                        <button
-                            v-for="p in myPicks"
-                            :key="p.id"
-                            type="button"
-                            class="px-2.5 py-1 rounded-md text-xs border transition-colors"
-                            :class="outPickIds.has(p.id) ? 'border-rose-500/60 bg-rose-500/10 text-rose-200' : 'border-slate-700 text-slate-400 hover:border-slate-500'"
-                            @click="togglePick(p.id)"
-                        >{{ pickLabel(p) }}</button>
+                    <div class="space-y-2">
+                        <div v-for="y in picksByYear" :key="y.year" class="flex items-start gap-3">
+                            <span class="w-10 pt-1.5 text-xs font-medium text-slate-500">{{ y.year }}</span>
+                            <div class="flex-1 grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
+                                <button
+                                    v-for="p in y.picks"
+                                    :key="p.id"
+                                    type="button"
+                                    class="px-2 py-1 rounded-md text-left border transition-colors"
+                                    :class="outPickIds.has(p.id) ? 'border-rose-500/60 bg-rose-500/10 text-rose-200' : 'border-slate-700 text-slate-300 hover:border-slate-500'"
+                                    @click="togglePick(p.id)"
+                                >
+                                    <span class="block text-xs font-medium">
+                                        {{ roundLabel(p.round) }} round
+                                        <span v-if="p.projected_pick" class="font-normal text-slate-500" :title="p.locked ? 'Locked' : 'Projected'">
+                                            #{{ p.projected_pick }}{{ p.locked ? '' : '?' }}
+                                        </span>
+                                    </span>
+                                    <span class="block text-[10px] truncate" :class="p.original_owner !== myTeam ? 'text-sky-400/80' : 'text-slate-600'">
+                                        {{ p.original_owner !== myTeam ? `via ${teamName(p.original_owner)}` : 'Own' }}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
                         <span v-if="!myPicks.length" class="text-xs text-slate-600">No picks owned.</span>
                     </div>
                 </div>
@@ -357,45 +525,5 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
             </section>
         </div>
 
-        <!-- Impact + execute -->
-        <section class="p-4 bg-slate-800/30 border border-slate-700/50 rounded-lg space-y-3">
-            <div class="flex flex-wrap gap-x-8 gap-y-1 text-xs text-slate-400">
-                <span>
-                    NHL cap: {{ impact.capDelta >= 0 ? '+' : '−' }}{{ formatCap(Math.abs(impact.capDelta)) }}
-                    → <span :class="impact.capHit > CAP_CEILING ? 'text-rose-400' : 'text-slate-200'">{{ formatCap(impact.capHit) }}</span>
-                    / {{ formatCap(CAP_CEILING) }}
-                </span>
-                <span>Contracts: <span :class="impact.contracts > MAX_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.contracts }}</span> / {{ MAX_CONTRACTS }}</span>
-                <span>Exempt: <span :class="impact.exempt > MAX_EXEMPT_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.exempt }}</span> / {{ MAX_EXEMPT_CONTRACTS }}</span>
-            </div>
-            <ul v-if="warnings.length" class="text-xs text-amber-400 space-y-0.5">
-                <li v-for="w in warnings" :key="w">{{ w }}</li>
-            </ul>
-
-            <input v-model="notes" placeholder="Notes (optional) — e.g. deadline sell, retained salary" :class="[inputClass, 'w-full text-sm py-1.5']" />
-
-            <p v-if="error" class="text-xs text-rose-400">{{ error }}</p>
-            <div class="flex flex-wrap items-center gap-3">
-                <span v-if="problems.length" class="text-xs text-slate-500">{{ problems[0] }}</span>
-                <template v-if="confirming">
-                    <span class="ml-auto text-xs text-slate-300">
-                        Execute trade with {{ teamName(partner) }}? Roster and picks update immediately.
-                    </span>
-                    <button
-                        :disabled="executing"
-                        class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors"
-                        @click="execute"
-                    >Confirm</button>
-                    <button class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200" @click="confirming = false">Cancel</button>
-                </template>
-                <button
-                    v-else
-                    :disabled="problems.length > 0"
-                    class="ml-auto px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors hover:opacity-90 disabled:opacity-40"
-                    :style="{ backgroundColor: 'var(--team-primary)' }"
-                    @click="confirming = true"
-                >Execute trade</button>
-            </div>
-        </section>
     </div>
 </template>

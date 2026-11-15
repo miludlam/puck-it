@@ -6,6 +6,7 @@ import LineBuilderLines from './LineBuilderLines.vue';
 import LineBuilderPool from './LineBuilderPool.vue';
 import LineBuilderScratches from "./LineBuilderScratches.vue";
 import ContextMenu, { ContextMenuItem } from '@/components/ContextMenu.vue';
+import PlayerModal from './PlayerModal.vue';
 
 const playerStore = usePlayerStore();
 
@@ -51,8 +52,29 @@ const scratchSlots = computed(() =>
 
 const firstOpen = (slots: string[]) => slots.find(s => !slotMap.value[s]) ?? null;
 
-// Right-click menu for pool players
+// Right-click menus
 const menu = ref<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+const viewingPlayer = ref<Player | null>(null);
+
+const viewInfoItem = (player: Player): ContextMenuItem => ({
+    label: 'View Player Info',
+    action: () => { viewingPlayer.value = player; },
+});
+
+// Promote AHL → NHL / demote NHL → AHL; the player leaves their line and lands in the other pool
+const moveItem = (player: Player): ContextMenuItem => {
+    const to: LineLeague = props.league === 'NHL' ? 'AHL' : 'NHL';
+    return {
+        label: to === 'NHL' ? 'Promote to NHL' : 'Demote to AHL',
+        hint: to === 'AHL' && player.waiver_eligible ? 'waivers' : undefined,
+        action: () => playerStore.update(player.id, { roster_league: to, line_slot: null, line_league: null }),
+    };
+};
+
+// Slotted players (lines and scratches)
+function openSlotMenu(player: Player, event: MouseEvent) {
+    menu.value = { x: event.clientX, y: event.clientY, items: [moveItem(player), viewInfoItem(player)] };
+}
 
 function openPoolMenu(player: Player, event: MouseEvent) {
     const positions = [player.position, player.position2].filter((p): p is Position => !!p);
@@ -76,6 +98,7 @@ function openPoolMenu(player: Player, event: MouseEvent) {
         });
     }
 
+    items.push(moveItem(player), viewInfoItem(player));
     menu.value = { x: event.clientX, y: event.clientY, items };
 }
 
@@ -128,6 +151,7 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
                     :slotMap="slotMap"
                     :league="league"
                     @drop="(playerID, fromSlot, toSlot) => handleDrop(playerID, fromSlot, toSlot)"
+                    @contextmenu="openSlotMenu"
                 />
 
                 <LineBuilderScratches
@@ -135,6 +159,7 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
                     :slotMap="slotMap"
                     :league="league"
                     @drop="(playerID, fromSlot, toSlot) => handleDrop(playerID, fromSlot, toSlot)"
+                    @contextmenu="openSlotMenu"
                 />
             </div>
 
@@ -156,6 +181,12 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
             :y="menu.y"
             :items="menu.items"
             @close="menu = null"
+        />
+        <PlayerModal
+            v-if="viewingPlayer"
+            :player="viewingPlayer"
+            readonly
+            @close="viewingPlayer = null"
         />
         <!-- Confirmation -->
         <div v-if="confirmClear" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">

@@ -62,6 +62,10 @@ const stateClass: Record<string, string> = {
     short: 'text-rose-400',
     ok: 'text-emerald-400',
 };
+
+// Hover list for a depth chart cell, best first
+const depthList = (group: Player[]) =>
+    group.map(p => `${p.overall}  ${p.first_name} ${p.last_name} (${p.age})`).join('\n') || 'None';
 </script>
 
 <template>
@@ -85,25 +89,29 @@ const stateClass: Record<string, string> = {
         </div>
 
         <div class="grid gap-8 lg:grid-cols-2">
-            <!-- Depth vs. lineup -->
+            <!-- Organizational depth chart -->
             <div>
-                <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">NHL Depth</h3>
+                <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Depth Chart</h3>
                 <table class="w-full text-sm border-collapse">
                     <thead>
                         <tr class="border-b border-slate-700 text-xs text-slate-500">
                             <th class="px-3 py-2 text-left font-medium">Pos</th>
-                            <th class="px-3 py-2 text-center font-medium">NHL</th>
-                            <th class="px-3 py-2 text-center font-medium">Spots</th>
-                            <th class="px-3 py-2 text-center font-medium" title="AHL players at least as good as the weakest NHL player at the position">AHL ready</th>
+                            <th class="px-3 py-2 text-center font-medium" title="NHL players / lineup spots">NHL</th>
+                            <th class="px-3 py-2 text-center font-medium">AHL</th>
+                            <th class="px-3 py-2 text-center font-medium" title="Unsigned and junior prospects">ITS</th>
+                            <th class="px-3 py-2 text-center font-medium">Org</th>
                             <th class="px-3 py-2 text-left font-medium"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="d in report.depth" :key="d.position" class="border-b border-slate-800/60">
                             <td class="px-3 py-1.5 text-slate-300">{{ d.position }}</td>
-                            <td class="px-3 py-1.5 text-center text-slate-300">{{ d.nhl }}</td>
-                            <td class="px-3 py-1.5 text-center text-slate-500">{{ d.slots }}</td>
-                            <td class="px-3 py-1.5 text-center text-slate-500">{{ d.ahlReady }}</td>
+                            <td class="px-3 py-1.5 text-center text-slate-300 cursor-default" :title="depthList(d.nhl)">
+                                {{ d.nhl.length }}<span class="text-slate-600">/{{ d.slots }}</span>
+                            </td>
+                            <td class="px-3 py-1.5 text-center text-slate-400 cursor-default" :title="depthList(d.ahl)">{{ d.ahl.length }}</td>
+                            <td class="px-3 py-1.5 text-center text-slate-400 cursor-default" :title="depthList(d.its)">{{ d.its.length }}</td>
+                            <td class="px-3 py-1.5 text-center text-slate-300">{{ d.nhl.length + d.ahl.length + d.its.length }}</td>
                             <td class="px-3 py-1.5 text-xs font-medium capitalize" :class="stateClass[d.state]">
                                 {{ d.state === 'ok' ? 'covered' : d.state }}
                             </td>

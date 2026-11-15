@@ -46,11 +46,12 @@ const contractTypes: ContractType[] = ['1-way', '2-way'];
 const contractClauses: Clause[] = ['NMC', 'NTC', 'M-NTC'];
 
 // CSS constants
-const inputClass = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500";
+const inputClass = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500 disabled:text-slate-300 disabled:cursor-default";
 const formGroupHeader = "text-xs font-medium text-slate-500 uppercase tracking-wider mb-3";
 
 const props = defineProps<{
     player?: Player;
+    readonly?: boolean; // view-only: inputs locked, no save or delete
 }>();
 
 const emit = defineEmits<{
@@ -159,13 +160,14 @@ watch(positionGroup, () => {
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <h2 class="text-base font-semibold">
-                    {{ props.player ? 'Edit Player' : 'Add Player' }}
+                    {{ props.readonly ? 'Player Info' : props.player ? 'Edit Player' : 'Add Player' }}
                 </h2>
                 <button
                     class="text-slate-400 hover:text-slate-200 transition-colors"
                     @click="emit('close')"
                 >✕</button>
             </div>
+            <fieldset :disabled="props.readonly" class="space-y-6 min-w-0">
             <!-- Group 1: Player Identity -->
             <div>
                 <h3 :class="formGroupHeader">Identity</h3>
@@ -322,8 +324,9 @@ watch(positionGroup, () => {
                     <textarea v-model="form.notes" :class="inputClass" rows="3" />
                 </div>
             </div>
+            </fieldset>
             <!-- Delete confirmation -->
-            <div v-if="props.player" class="pt-4 border-t border-slate-700">
+            <div v-if="props.player && !props.readonly" class="pt-4 border-t border-slate-700">
                 <div v-if="!showDeleteConfirm">
                     <button
                         class="text-xs text-rose-400 hover:text-rose-300 transition-colors"
@@ -347,8 +350,9 @@ watch(positionGroup, () => {
                 <button
                     class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors"
                     @click="emit('close')"
-                >Cancel</button>
+                >{{ props.readonly ? 'Close' : 'Cancel' }}</button>
                 <button
+                    v-if="!props.readonly"
                     class="px-4 py-2 rounded-lg text-sm hover:bg-sky-500 text-white font-medium transition-colors"
                     :style="{ backgroundColor: 'var(--team-primary)' }"
                     @click="save"

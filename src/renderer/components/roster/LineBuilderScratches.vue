@@ -14,6 +14,7 @@ const emit = defineEmits<{
         fromSlot: string | null,
         toSlot: string,
     ];
+    contextmenu: [player: Player, event: MouseEvent];
 }>();
 
 const scratches = computed(() => [
@@ -38,6 +39,7 @@ const scratches = computed(() => [
                     :league="league"
                     class="flex-1"
                     @drop="(playerID, fromSlot) => emit('drop', playerID, fromSlot, slotKey)"
+                    @contextmenu="(player, event) => emit('contextmenu', player, event)"
                 />
             </div>
         </div>
