@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useFranchiseStore, usePickStore, usePlayerStore, useScoutedPlayerStore } from '@/stores';
+import { useContractStore, useFranchiseStore, usePickStore, usePlayerStore, useScoutedPlayerStore } from '@/stores';
 import { Pick, ScoutedPlayer } from '@/types';
 import { analyzeRoster, FALLER_MARGIN, planPicks, PickPlan } from '@/utils/draftTargets';
+import { rosterAfterDeals } from '@/utils/contracts';
 import LockIcon from '@/components/LockIcon.vue';
 import ScoutedPlayerModal from '@/components/draft/ScoutedPlayerModal.vue';
+import DraftStandings from '@/components/draft/DraftStandings.vue';
 
 const franchiseStore = useFranchiseStore();
 const pickStore = usePickStore();
 const playerStore = usePlayerStore();
 const scoutedStore = useScoutedPlayerStore();
+const contractStore = useContractStore();
 
 const normalizeYear = (y: number) => y < 100 ? 2000 + y : y;
 const roundLabel = (r: number) => ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'][r - 1] ?? `${r}th`;
@@ -33,7 +36,10 @@ const myPicks = computed(() => {
         );
 });
 
-const needs = computed(() => analyzeRoster(playerStore.players));
+// Needs as of once accepted extensions and free-agent signings take effect
+const needs = computed(() => analyzeRoster(
+    rosterAfterDeals(playerStore.players, contractStore.extensions, contractStore.freeAgents)
+));
 const positionNeeds = computed(() =>
     Object.values(needs.value.positions).filter(n => n.score > 0).sort((a, b) => b.score - a.score)
 );
@@ -41,8 +47,11 @@ const typeNeeds = computed(() =>
     needs.value.types.filter(t => t.score > 0).sort((a, b) => b.score - a.score)
 );
 
-const ranked = computed(() => scoutedStore.scoutedPlayers.filter(p => p.cs_rank !== null));
-const unrankedCount = computed(() => scoutedStore.scoutedPlayers.length - ranked.value.length);
+// Prospects still available: drafted-elsewhere players drop out of the targets
+const available = computed(() => scoutedStore.scoutedPlayers.filter(p => !p.taken));
+const takenCount = computed(() => scoutedStore.scoutedPlayers.length - available.value.length);
+const ranked = computed(() => available.value.filter(p => p.cs_rank !== null));
+const unrankedCount = computed(() => available.value.length - ranked.value.length);
 
 // Plan targets for every projected pick, keyed by pick id
 const plans = computed(() => {
@@ -78,6 +87,7 @@ const editingProspect = ref<ScoutedPlayer | null>(null);
             <span class="text-xs text-slate-600">
                 Targets from {{ ranked.length }} ranked Board prospect{{ ranked.length === 1 ? '' : 's' }}
                 <template v-if="unrankedCount"> · {{ unrankedCount }} without a CS rank ignored</template>
+                <template v-if="takenCount"> · {{ takenCount }} taken by other teams</template>
             </span>
         </div>
 
@@ -98,6 +108,8 @@ const editingProspect = ref<ScoutedPlayer | null>(null);
             >{{ t.type }} {{ t.have }}/{{ t.want }}</span>
             <span v-if="!positionNeeds.length && !typeNeeds.length" class="text-slate-600">none flagged</span>
         </div>
+
+        <DraftStandings :picks="myPicks" />
 
         <div v-if="!myPicks.length"
              class="rounded-xl border border-dashed border-slate-700 p-8 text-center text-slate-500 text-sm">

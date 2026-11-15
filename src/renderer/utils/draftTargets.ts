@@ -32,6 +32,12 @@ const TYPE_MIX: Record<Group, Partial<Record<PlayerType, number>>> = {
     G:   {},
 };
 
+export const PLAYER_TYPES: Record<Group, PlayerType[]> = {
+    FWD: ['ENF', 'GRN', 'PLY', 'PWF', 'SNP', 'TWF'],
+    DEF: ['DFD', 'ENF', 'OFD', 'TWD'],
+    G: ['BF', 'HYB', 'SU'],
+};
+
 export const TYPE_NAMES: Partial<Record<PlayerType, string>> = {
     PLY: 'playmakers', SNP: 'snipers', PWF: 'power forwards', TWF: 'two-way forwards',
     GRN: 'grinders', ENF: 'enforcers', OFD: 'offensive D', TWD: 'two-way D', DFD: 'defensive D',

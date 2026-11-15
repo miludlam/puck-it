@@ -5,6 +5,7 @@ import PipelineTab from '@/components/draft/PipelineTab.vue';
 import BoardTab from '@/components/draft/BoardTab.vue';
 import ScoutsTab from '@/components/draft/ScoutsTab.vue';
 import ShortlistsTab from '@/components/draft/ShortlistsTab.vue';
+import DraftSettingsBar from '@/components/draft/DraftSettingsBar.vue';
 
 type DraftTab = 'picks' | 'pipeline' | 'board' | 'scouts' | 'shortlists';
 const activeTab = ref<DraftTab>('picks');
@@ -20,7 +21,7 @@ const tabs: { key: DraftTab; label: string }[] = [
 
 <template>
     <div class="p-6">
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div class="flex gap-1 p-1 bg-slate-800/50 rounded-lg">
                 <button
                     v-for="tab in tabs"
@@ -32,6 +33,7 @@ const tabs: { key: DraftTab; label: string }[] = [
                     @click="activeTab = tab.key"
                 >{{ tab.label }}</button>
             </div>
+            <DraftSettingsBar />
         </div>
 
         <PicksTab    v-if="activeTab === 'picks'"    />

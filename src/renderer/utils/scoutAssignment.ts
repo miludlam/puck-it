@@ -26,6 +26,7 @@ const ratingValue: Record<ScoutRating, number> = {
 };
 
 const value = (rating: ScoutRating | null | undefined) => rating ? ratingValue[rating] : 0;
+export const ratingScore = value;
 
 /**
  * Dense priority rank for each scout (higher = better): overall first, then region

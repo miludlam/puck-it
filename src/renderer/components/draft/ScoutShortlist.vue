@@ -30,7 +30,7 @@ const modalPlayer = ref<ScoutedPlayer | null | undefined>(undefined);
                     <th class="px-2 py-1 text-left font-medium w-12">Pos</th>
                     <th class="px-2 py-1 text-left font-medium w-12">Age</th>
                     <th class="px-2 py-1 text-left font-medium w-14">Proj.</th>
-                    <th class="px-2 py-1 text-left font-medium w-12" title="Overall, once refined on the Board">Ovr</th>
+                    <th class="px-2 py-1 text-left font-medium w-12">Type</th>
                 </tr>
             </thead>
             <tbody>
@@ -41,11 +41,14 @@ const modalPlayer = ref<ScoutedPlayer | null | undefined>(undefined);
                     @click="modalPlayer = player"
                 >
                     <td class="px-2 py-1 font-medium text-slate-300">{{ player.cs_rank ?? '—' }}</td>
-                    <td class="px-2 py-1 text-slate-200">{{ player.first_name }} {{ player.last_name }}</td>
+                    <td class="px-2 py-1" :class="player.taken ? 'text-slate-500 line-through' : 'text-slate-200'">
+                        {{ player.first_name }} {{ player.last_name }}
+                        <span v-if="player.taken" class="ml-1 text-[10px] text-slate-500 no-underline">Taken</span>
+                    </td>
                     <td class="px-2 py-1 text-slate-400">{{ player.position ?? '—' }}</td>
                     <td class="px-2 py-1 text-slate-400">{{ player.age ?? '—' }}</td>
                     <td class="px-2 py-1 text-slate-500">{{ player.cs_rank ? `Rd ${projectedRound(player.cs_rank)}` : '—' }}</td>
-                    <td class="px-2 py-1 text-slate-500">{{ player.overall ?? '—' }}</td>
+                    <td class="px-2 py-1 text-slate-500">{{ player.player_type ?? '—' }}</td>
                 </tr>
             </tbody>
         </table>

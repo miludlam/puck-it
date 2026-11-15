@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useFranchiseStore, usePlayerStore } from '@/stores';
+import { useCapStore, useFranchiseStore, usePlayerStore } from '@/stores';
 import FranchiseModal from "@/components/franchise/FranchiseModal.vue";
-import { CAP_CEILING, formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS, MAX_ROSTER } from '@/utils/league';
+import { formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS, MAX_ROSTER } from '@/utils/league';
 
 // Load the stores
 const franchiseStore = useFranchiseStore();
 const playerStore = usePlayerStore();
+const capStore = useCapStore();
 
 const teamName = computed(() =>
     franchiseStore.currentTeam?.name ?? 'No team selected'
@@ -24,10 +25,10 @@ const nhlRosterCount = computed(() =>
     playerStore.nhlRosterCount
 );
 const capSpace = computed(() =>
-    formatCap(CAP_CEILING - playerStore.nhlCapHit)
+    formatCap(capStore.current - playerStore.nhlCapHit)
 );
 const capSpaceNegative = computed(() =>
-    playerStore.nhlCapHit > CAP_CEILING
+    playerStore.nhlCapHit > capStore.current
 );
 
 const showModal = ref(false);
@@ -45,7 +46,7 @@ const showModal = ref(false);
         >{{ teamName }} · {{ franchiseStore.formattedSeason }}</span>
         <span class="text-sm font-medium">Contracts: {{ contractCount }} / {{ MAX_CONTRACTS }}</span>
         <span class="text-sm font-medium">Exempt: {{ exemptContractCount }} / {{ MAX_EXEMPT_CONTRACTS }}</span>
-        <span class="text-sm font-medium">Cap: {{ nhlCapHit }} / {{ formatCap(CAP_CEILING) }}</span>
+        <span class="text-sm font-medium">Cap: {{ nhlCapHit }} / {{ formatCap(capStore.current) }}</span>
         <span
             class="text-sm font-medium"
             :class="capSpaceNegative ? 'text-rose-400' : 'text-emerald-400'"

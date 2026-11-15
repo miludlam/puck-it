@@ -8,6 +8,7 @@ import LineBuilderScratches from "./LineBuilderScratches.vue";
 import LineBuilderIR from './LineBuilderIR.vue';
 import ContextMenu, { ContextMenuItem } from '@/components/ContextMenu.vue';
 import PlayerModal from './PlayerModal.vue';
+import { MAX_ROSTER, MIN_ROSTER } from '@/utils/league';
 
 const playerStore = usePlayerStore();
 
@@ -44,11 +45,25 @@ const slotMap = computed(() => {
     return map;
 });
 
-const nhlSlottedCount = computed(() =>
-    props.league === 'NHL'
-        ? playerStore.players.filter(p => p.line_slot !== null && p.line_league === 'NHL' && !isIR(p.line_slot)).length
-        : null
-);
+// NHL roster: everyone on lines, scratched or in the pool. IR and injured players don't count
+// (matches the header).
+const nhlRoster = computed(() => {
+    if (props.league !== 'NHL') return null;
+    const counted = (p: Player | null): p is Player => !!p && p.status !== 'Injured';
+    const slotted = Object.values(slotMap.value).filter(counted);
+    const scratched = slotted.filter(p => scratchSlots.value.includes(p.line_slot!)).length;
+    const pool = poolPlayers.value.filter(counted).length;
+    const count = playerStore.nhlRosterCount;
+    const state = count > MAX_ROSTER ? 'over' : count < MIN_ROSTER ? 'under' : 'ok';
+    return {
+        count,
+        state,
+        dressed: slotted.length - scratched,
+        scratched,
+        pool,
+        ir: irPlayers.value.length,
+    };
+});
 
 // Slot keys in line order — mirrors the layouts in LineBuilderLines / LineBuilderScratches
 function slotsFor(position: Position): string[] {
@@ -162,15 +177,24 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
     <div>
         <div class="flex items-center justify-between mb-4">
             <div
-                v-if="props.league === 'NHL' && nhlSlottedCount !== null"
-                class="flex items-center justify-between px-4 py-2 rounded-lg mb-4 text-xs font-medium"
+                v-if="nhlRoster"
+                class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2 rounded-lg mb-4 text-xs"
                 :class="{
-                'bg-emerald-500/10 text-emerald-400': nhlSlottedCount <= 20,
-                'bg-amber-500/10 text-amber-400':     nhlSlottedCount > 20 && nhlSlottedCount < 23,
-                'bg-rose-500/10 text-rose-400':       nhlSlottedCount >= 23,
-            }"
+                    'bg-emerald-500/10 text-emerald-400': nhlRoster.state === 'ok',
+                    'bg-amber-500/10 text-amber-400':     nhlRoster.state === 'under',
+                    'bg-rose-500/10 text-rose-400':       nhlRoster.state === 'over',
+                }"
             >
-                <span>NHL Roster: {{ nhlSlottedCount }} / 23</span>
+                <span class="font-medium">NHL Roster: {{ nhlRoster.count }} / {{ MAX_ROSTER }}</span>
+                <span v-if="nhlRoster.state === 'over'" class="font-medium">
+                    Over by {{ nhlRoster.count - MAX_ROSTER }} — demote or place on IR
+                </span>
+                <span v-else-if="nhlRoster.state === 'under'" class="font-medium">
+                    Under the {{ MIN_ROSTER }}-player minimum by {{ MIN_ROSTER - nhlRoster.count }}
+                </span>
+                <span class="text-slate-500">
+                    {{ nhlRoster.dressed }} dressed · {{ nhlRoster.scratched }} scratched · {{ nhlRoster.pool }} in pool<template v-if="nhlRoster.ir"> · {{ nhlRoster.ir }} on IR (not counted)</template>
+                </span>
             </div>
             <div v-else />
 

@@ -63,7 +63,7 @@ export interface Player {
     overall: number;
     potential_level: PotentialLevel;
     potential_chance: PotentialChance;
-    player_type: PlayerType;
+    player_type: PlayerType | ''; // '' = not set yet
     role: string;
     aav: number;
     years_remaining: number;
@@ -192,6 +192,7 @@ export interface Scout {
     region_ratings: Partial<Record<JuniorLeague, ScoutRating>>;
     region: JuniorLeague | null;
     region_locked: boolean;
+    obligations_done: boolean;     // assignment finished — free to scout Board gaps
     status: ScoutStatus;
     assignment_end: string | null; // 'MM-DD' the shortlist assignment ends (years are irrelevant)
 }
@@ -207,6 +208,7 @@ export interface ScoutedPlayer {
     age: number | null;
     junior_league: JuniorLeague | null;
     cs_rank: number | null; // Central Scouting rank ≈ projected pick
+    original_cs_rank: number | null; // first CS rank recorded, to show movement since
     overall: number | null;
     potential_level: PotentialLevel | null;
     potential_chance: PotentialChance | null;
@@ -215,23 +217,94 @@ export interface ScoutedPlayer {
     scout_id: number | null;
     notes: string | null;
     gem_bust: GemBust | null; // revealed by scouting; stays on the draft screen
+    taken: number;            // 1 = drafted by another team
 }
 
 export type GemBust = 'Gem' | 'Bust';
 
-// A prospect with every field the draft needs filled in
+// A prospect with every scoutable field filled in. Overall isn't one — it's only
+// revealed once the player is drafted, so it's entered at the draft confirm.
 export type RefinedScoutedPlayer = ScoutedPlayer & {
     position: Position;
     age: number;
-    overall: number;
     potential_level: PotentialLevel;
     potential_chance: PotentialChance;
     player_type: PlayerType;
 };
 
 export function isRefined(p: ScoutedPlayer): p is RefinedScoutedPlayer {
-    return p.position !== null && p.age !== null && p.overall !== null
+    return p.position !== null && p.age !== null
         && p.potential_level !== null && p.potential_chance !== null && p.player_type !== null;
+}
+
+// Per-season draft settings, randomized with a d100 (1–25 Low, 26–75 Medium, 76–100 High)
+export type DraftQuality = 'Low' | 'Medium' | 'High';
+
+export interface DraftSettings {
+    season: number;
+    class_quality: DraftQuality | null;     // Draft Class Quality
+    class_roll: number | null;              // null = set by hand
+    prospect_quality: DraftQuality | null;  // Generated Prospect Quality
+    prospect_roll: number | null;
+    updated_at: string;
+}
+
+// A team's league standing for a season, used to estimate where its picks land
+export interface TeamStanding {
+    season: number;
+    team_id: string;
+    position: number | null;      // league-wide, 1 = best record
+    in_lottery: boolean | null;   // missed the playoffs; null = judged from position
+    lottery_pick: number | null;  // 1st-round pick once the lottery is drawn
+}
+
+// Contracts
+export interface CapCeiling {
+    season: number;
+    ceiling: number; // $M
+}
+
+export type FAStatus = 'RFA' | 'UFA';
+export type ExtensionStatus = 'Negotiating' | 'Offered' | 'Accepted' | 'Declined' | 'Letting go';
+export type FreeAgentStatus = 'Shortlisted' | 'Offered' | 'Accepted' | 'Declined' | 'Signed elsewhere';
+
+// Terms on the table: asked for by the player, or offered by us
+export interface ContractTerms {
+    asking_aav: number | null;
+    asking_years: number | null;
+    offer_aav: number | null;
+    offer_years: number | null;
+    offer_type: ContractType | null;
+    offer_clause: Clause | null;
+}
+
+// Re-signing talks with one of our players. An accepted extension starts when the
+// current contract ends.
+export interface Extension extends ContractTerms {
+    player_id: number;
+    fa_status: FAStatus | null; // null = judged from age
+    status: ExtensionStatus;
+    notes: string | null;
+}
+
+// A free agent on our shortlist
+export interface FreeAgent extends ContractTerms {
+    id: number;
+    first_name: string;
+    last_name: string;
+    position: Position;
+    age: number | null;
+    overall: number | null;
+    potential_level: PotentialLevel | null;
+    potential_chance: PotentialChance | null;
+    player_type: PlayerType | null;
+    role: string | null;
+    fa_type: FAStatus;
+    rights_team: string | null; // RFA's current team, owed offer-sheet compensation
+    target_league: LineLeague;  // where they'd play if signed
+    status: FreeAgentStatus;
+    notes: string | null;
+    created_at: string;
 }
 
 // Max prospects on one scout's shortlist (mirrors the main-process check)

@@ -83,7 +83,16 @@ function setEndDay(scout: Scout, day: number) {
                             · {{ scoutedStore.forScout(scout.id).length }}/{{ SHORTLIST_MAX }} shortlisted
                         </p>
                     </div>
-                    <div class="ml-auto flex items-center gap-2 text-xs text-slate-500">
+                    <button
+                        type="button"
+                        class="ml-auto px-2 py-0.5 rounded border text-xs transition-colors"
+                        :class="scout.obligations_done
+                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                            : 'border-slate-700 text-slate-500 hover:text-slate-300'"
+                        :title="scout.obligations_done ? 'Free to fill Board gaps — click to put back on assignment' : 'Mark the assignment finished — the Board will suggest them for unscouted prospects'"
+                        @click="scoutStore.update(scout.id, { obligations_done: !scout.obligations_done })"
+                    >{{ scout.obligations_done ? '✓ Obligations done' : 'On assignment' }}</button>
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
                         Assignment ends
                         <select
                             :value="parseEnd(scout).month ?? ''"

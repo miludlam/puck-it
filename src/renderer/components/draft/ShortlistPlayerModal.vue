@@ -142,7 +142,7 @@ async function removeFromShortlist() {
                 </div>
             </div>
 
-            <p class="text-xs text-slate-500">Also added to the Board, where you can refine overall, potential and more.</p>
+            <p class="text-xs text-slate-500">Also added to the Board, where you can refine type, potential and more.</p>
             <p v-if="error" class="text-xs text-rose-400">{{ error }}</p>
 
             <div class="flex items-center gap-3 pt-3 border-t border-slate-700">

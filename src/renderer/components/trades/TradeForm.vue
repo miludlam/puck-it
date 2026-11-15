@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import { useFranchiseStore, usePickStore, usePlayerStore, useTradeStore } from '@/stores';
+import { useCapStore, useFranchiseStore, usePickStore, usePlayerStore, useTradeStore } from '@/stores';
 import {
     Clause, ContractType, IncomingPlayer, League, Pick, Player, PlayerType, Position,
     PotentialChance, PotentialLevel,
 } from '@/types';
 import { groupOf, POTENTIAL_TIERS } from '@/utils/draftTargets';
-import { CAP_CEILING, formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
+import { formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
 import { evaluateTradeBlock } from '@/utils/tradeBlock';
 import { analyzeTrade, Verdict } from '@/utils/tradeAnalysis';
 
@@ -17,6 +17,7 @@ const franchiseStore = useFranchiseStore();
 const playerStore = usePlayerStore();
 const pickStore = usePickStore();
 const tradeStore = useTradeStore();
+const capStore = useCapStore();
 
 const inputClass = "bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-sky-500";
 const sectionHeader = "text-xs font-medium text-slate-500 uppercase tracking-wider mb-2";
@@ -66,7 +67,7 @@ const blockReasons = computed(() => {
     const report = evaluateTradeBlock(
         playerStore.players,
         franchiseStore.franchise?.team_status ?? 'Bubble',
-        CAP_CEILING - playerStore.nhlCapHit,
+        capStore.current - playerStore.nhlCapHit,
         myPicks.value,
         draftYear.value,
     );
@@ -186,6 +187,7 @@ const analysis = computed(() => {
         status: franchiseStore.franchise?.team_status ?? 'Bubble',
         capBefore: playerStore.nhlCapHit,
         capAfter: impact.value.capHit,
+        capCeiling: capStore.current,
     });
 });
 
@@ -220,7 +222,7 @@ const problems = computed(() => {
 });
 const warnings = computed(() => {
     const list: string[] = [];
-    if (impact.value.capHit > CAP_CEILING) list.push(`Over the cap after this trade (${formatCap(impact.value.capHit)})`);
+    if (impact.value.capHit > capStore.current) list.push(`Over the cap after this trade (${formatCap(impact.value.capHit)})`);
     if (impact.value.contracts > MAX_CONTRACTS) list.push(`${impact.value.contracts} contracts — over the ${MAX_CONTRACTS} limit`);
     if (impact.value.exempt > MAX_EXEMPT_CONTRACTS) list.push(`${impact.value.exempt} exempt contracts — over ${MAX_EXEMPT_CONTRACTS}`);
     for (const p of outPlayers.value) if (p.clause) list.push(`${p.last_name} has a ${p.clause}`);
@@ -282,8 +284,8 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
             <div class="flex flex-wrap gap-x-8 gap-y-1 text-xs text-slate-400">
                 <span>
                     NHL cap: {{ impact.capDelta >= 0 ? '+' : '−' }}{{ formatCap(Math.abs(impact.capDelta)) }}
-                    → <span :class="impact.capHit > CAP_CEILING ? 'text-rose-400' : 'text-slate-200'">{{ formatCap(impact.capHit) }}</span>
-                    / {{ formatCap(CAP_CEILING) }}
+                    → <span :class="impact.capHit > capStore.current ? 'text-rose-400' : 'text-slate-200'">{{ formatCap(impact.capHit) }}</span>
+                    / {{ formatCap(capStore.current) }}
                 </span>
                 <span>Contracts: <span :class="impact.contracts > MAX_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.contracts }}</span> / {{ MAX_CONTRACTS }}</span>
                 <span>Exempt: <span :class="impact.exempt > MAX_EXEMPT_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.exempt }}</span> / {{ MAX_EXEMPT_CONTRACTS }}</span>

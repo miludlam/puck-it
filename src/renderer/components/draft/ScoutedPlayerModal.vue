@@ -9,7 +9,10 @@ import {
 const scoutedStore = useScoutedPlayerStore();
 const scoutStore = useScoutStore();
 
-const props = defineProps<{ player?: ScoutedPlayer }>();
+const props = defineProps<{
+    player?: ScoutedPlayer;
+    csRank?: number; // prefill when adding into a gap on the Board
+}>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const inputClass = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500";
@@ -43,19 +46,20 @@ const fwdTypes: PlayerType[] = ['ENF', 'GRN', 'PLY', 'PWF', 'SNP', 'TWF'];
 const defTypes: PlayerType[] = ['DFD', 'ENF', 'OFD', 'TWD'];
 const goalieTypes: PlayerType[] = ['BF', 'HYB', 'SU'];
 
-const form = reactive<Omit<ScoutedPlayer, 'id'>>({
+const form = reactive<Omit<ScoutedPlayer, 'id' | 'taken'>>({
     first_name:      props.player?.first_name      ?? '',
     last_name:       props.player?.last_name       ?? '',
     position:        props.player?.position        ?? 'C',
     position2:       props.player?.position2       ?? null,
     age:             props.player?.age             ?? 17,
     junior_league:   props.player?.junior_league   ?? null,
-    cs_rank:         props.player?.cs_rank         ?? null,
-    overall:         props.player?.overall         ?? null, // unknown until drafted
+    cs_rank:         props.player?.cs_rank         ?? props.csRank ?? null,
+    original_cs_rank: props.player?.original_cs_rank ?? null,
+    overall:         null, // only revealed once drafted — entered at the draft confirm
     // Blank potential = "needs refining" (fog of war); chosen once scouting reveals it
     potential_level: props.player?.potential_level ?? null,
     potential_chance:props.player?.potential_chance?? null,
-    player_type:     props.player?.player_type     ?? 'TWF',
+    player_type:     props.player?.player_type     ?? null,
     nhl_readiness:   props.player?.nhl_readiness   ?? null,
     scout_id:        props.player?.scout_id        ?? null,
     notes:           props.player?.notes           ?? null,
@@ -94,10 +98,6 @@ const position2Options = computed(() =>
     }).filter(p => p !== form.position)
 );
 
-// New prospects and shortlist quick-adds have no type yet — start them on the first
-// option valid for their position rather than the forward default above
-if (!props.player?.player_type) form.player_type = typeOptions.value[0];
-
 // League follows the scout's region unless set to something else by hand
 watch(() => form.scout_id, (scoutID, previousID) => {
     if (form.junior_league === null || form.junior_league === scoutStore.regionOf(previousID)) {
@@ -108,7 +108,7 @@ watch(() => form.scout_id, (scoutID, previousID) => {
 watch(positionGroup, () => {
     // Tiers differ by group (Top 6 F ≠ Top 6 D) — keep only ones valid for the new group
     if (form.potential_level && !potentialOptions.value.includes(form.potential_level)) form.potential_level = null;
-    form.player_type = typeOptions.value[0];
+    if (form.player_type && !typeOptions.value.includes(form.player_type)) form.player_type = null;
     form.position2 = null;
 });
 
@@ -118,7 +118,10 @@ async function save() {
     const payload = {
         ...form,
         cs_rank: typeof form.cs_rank === 'number' ? form.cs_rank : null,
-        overall: typeof form.overall === 'number' ? form.overall : null,
+        // Blank original = take the current rank as the first assessment
+        original_cs_rank: typeof form.original_cs_rank === 'number'
+            ? form.original_cs_rank
+            : typeof form.cs_rank === 'number' ? form.cs_rank : null,
         // A chance only means something alongside a potential level
         potential_chance: form.potential_level ? form.potential_chance : null,
     };
@@ -171,6 +174,10 @@ async function remove() {
                         <input v-model.number="form.cs_rank" type="number" min="1" placeholder="Projected pick" :class="inputClass" />
                     </div>
                     <div>
+                        <label class="block text-xs text-slate-400 mb-1">Original CS Ranking</label>
+                        <input v-model.number="form.original_cs_rank" type="number" min="1" placeholder="Same as current" :class="inputClass" />
+                    </div>
+                    <div>
                         <label class="block text-xs text-slate-400 mb-1">Junior League</label>
                         <select v-model="form.junior_league" :class="inputClass">
                             <option :value="null">—</option>
@@ -200,6 +207,7 @@ async function remove() {
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Type</label>
                         <select v-model="form.player_type" :class="inputClass">
+                            <option :value="null">—</option>
                             <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
                         </select>
                     </div>
@@ -210,10 +218,6 @@ async function remove() {
             <div>
                 <h3 :class="formGroupHeader">Quality</h3>
                 <div class="grid grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Overall</label>
-                        <input v-model.number="form.overall" type="number" min="45" max="99" placeholder="Known once drafted" :class="inputClass" />
-                    </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Potential</label>
                         <select v-model="form.potential_level" :class="inputClass">

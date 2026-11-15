@@ -42,6 +42,7 @@ function mapScout(row: Record<string, unknown>) {
             ? JSON.parse(row.region_ratings as string)
             : {},
         region_locked: Boolean(row.region_locked),
+        obligations_done: Boolean(row.obligations_done),
     };
 }
 
@@ -133,6 +134,9 @@ function createSchema() {
         db.exec("ALTER TABLE scouts ADD COLUMN status TEXT NOT NULL DEFAULT 'hired'");
     if (!scoutColNames.includes('assignment_end'))
         db.exec("ALTER TABLE scouts ADD COLUMN assignment_end TEXT DEFAULT NULL");
+    // Set by hand once a scout's assignment is finished — free to fill Board gaps
+    if (!scoutColNames.includes('obligations_done'))
+        db.exec("ALTER TABLE scouts ADD COLUMN obligations_done INTEGER NOT NULL DEFAULT 0");
     // Assignment end dates are month/day only — strip the year from any 'YYYY-MM-DD'
     db.exec("UPDATE scouts SET assignment_end = substr(assignment_end, 6) WHERE length(assignment_end) = 10");
 
@@ -144,6 +148,73 @@ function createSchema() {
             assets      TEXT    NOT NULL,  -- JSON TradeAsset[] snapshot (players as they were, pick ownership)
             notes       TEXT    DEFAULT NULL,
             created_at  TEXT    DEFAULT (datetime('now'))
+        );
+
+        -- Randomized each season: Low / Medium / High, with the d100 roll that produced it
+        CREATE TABLE IF NOT EXISTS draft_settings (
+            season            INTEGER PRIMARY KEY,
+            class_quality     TEXT    DEFAULT NULL,
+            class_roll        INTEGER DEFAULT NULL,
+            prospect_quality  TEXT    DEFAULT NULL,
+            prospect_roll     INTEGER DEFAULT NULL,
+            updated_at        TEXT    DEFAULT (datetime('now'))
+        );
+
+        -- League standings for teams whose picks we hold, used to estimate pick positions
+        CREATE TABLE IF NOT EXISTS team_standings (
+            season        INTEGER NOT NULL,
+            team_id       TEXT    NOT NULL,
+            position      INTEGER DEFAULT NULL,  -- league-wide, 1 = best record
+            in_lottery    INTEGER DEFAULT NULL,  -- 1/0 set by hand; NULL = from position
+            lottery_pick  INTEGER DEFAULT NULL,  -- 1st-round pick after the lottery draw
+            PRIMARY KEY (season, team_id)
+        );
+
+        -- Salary cap set by hand for a season; seasons without one carry the last cap forward
+        CREATE TABLE IF NOT EXISTS cap_ceilings (
+            season   INTEGER PRIMARY KEY,
+            ceiling  REAL    NOT NULL
+        );
+
+        -- Re-signing talks with our own players whose deals are running out. One row per
+        -- player; an accepted extension starts once the current contract ends.
+        CREATE TABLE IF NOT EXISTS extensions (
+            player_id     INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+            fa_status     TEXT    DEFAULT NULL,  -- 'RFA' | 'UFA'; NULL = from age
+            asking_aav    REAL    DEFAULT NULL,
+            asking_years  INTEGER DEFAULT NULL,
+            offer_aav     REAL    DEFAULT NULL,
+            offer_years   INTEGER DEFAULT NULL,
+            offer_type    TEXT    DEFAULT NULL,
+            offer_clause  TEXT    DEFAULT NULL,
+            status        TEXT    NOT NULL DEFAULT 'Negotiating',
+            notes         TEXT    DEFAULT NULL
+        );
+
+        -- Free agents we're interested in, with what they want and what we've offered
+        CREATE TABLE IF NOT EXISTS free_agents (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            first_name        TEXT    NOT NULL DEFAULT '',
+            last_name         TEXT    NOT NULL DEFAULT '',
+            position          TEXT    NOT NULL DEFAULT 'C',
+            age               INTEGER DEFAULT NULL,
+            overall           INTEGER DEFAULT NULL,
+            potential_level   TEXT    DEFAULT NULL,
+            potential_chance  TEXT    DEFAULT NULL,
+            player_type       TEXT    DEFAULT NULL,
+            role              TEXT    DEFAULT NULL,
+            fa_type           TEXT    NOT NULL DEFAULT 'UFA',
+            rights_team       TEXT    DEFAULT NULL,  -- RFA's current team (receives offer-sheet compensation)
+            asking_aav        REAL    DEFAULT NULL,
+            asking_years      INTEGER DEFAULT NULL,
+            offer_aav         REAL    DEFAULT NULL,
+            offer_years       INTEGER DEFAULT NULL,
+            offer_type        TEXT    DEFAULT NULL,
+            offer_clause      TEXT    DEFAULT NULL,
+            target_league     TEXT    NOT NULL DEFAULT 'NHL',
+            status            TEXT    NOT NULL DEFAULT 'Shortlisted',
+            notes             TEXT    DEFAULT NULL,
+            created_at        TEXT    DEFAULT (datetime('now'))
         );
     `);
 
@@ -160,6 +231,14 @@ function createSchema() {
     const prospectColNames = (db.prepare("PRAGMA table_info(scouted_players)").all() as { name: string }[]).map(c => c.name);
     if (!prospectColNames.includes('gem_bust'))
         db.exec("ALTER TABLE scouted_players ADD COLUMN gem_bust TEXT DEFAULT NULL");
+    // Drafted by another team (who doesn't matter) — kept on the board, out of the targets
+    if (!prospectColNames.includes('taken'))
+        db.exec("ALTER TABLE scouted_players ADD COLUMN taken INTEGER NOT NULL DEFAULT 0");
+    // CS rank at first assessment, to show movement since. Existing prospects start from today's rank.
+    if (!prospectColNames.includes('original_cs_rank')) {
+        db.exec("ALTER TABLE scouted_players ADD COLUMN original_cs_rank INTEGER DEFAULT NULL");
+        db.exec("UPDATE scouted_players SET original_cs_rank = cs_rank");
+    }
 
     // Prospects with no league default to the region their scout is working
     db.exec(`
@@ -481,6 +560,9 @@ function updateScout(id: number, scout: Record<string, unknown>) {
         ...(scout.region_locked !== undefined && {
             region_locked: scout.region_locked ? 1 : 0,
         }),
+        ...(scout.obligations_done !== undefined && {
+            obligations_done: scout.obligations_done ? 1 : 0,
+        }),
     };
 
     const fields = Object.keys(data)
@@ -529,17 +611,19 @@ function addScoutedPlayer(player: Record<string, unknown>) {
         INSERT INTO scouted_players (
             first_name, last_name, position, position2, age, junior_league, cs_rank,
             overall, potential_level, potential_chance, player_type,
-            nhl_readiness, scout_id, notes, gem_bust
+            nhl_readiness, scout_id, notes, gem_bust, original_cs_rank
         ) VALUES (
             @first_name, @last_name, @position, @position2, @age, @junior_league, @cs_rank,
             @overall, @potential_level, @potential_chance, @player_type,
-            @nhl_readiness, @scout_id, @notes, @gem_bust
+            @nhl_readiness, @scout_id, @notes, @gem_bust, @original_cs_rank
         )
     `).run({
         position: null, position2: null, age: null, junior_league: null, cs_rank: null,
         overall: null, potential_level: null, potential_chance: null, player_type: null,
         nhl_readiness: null, scout_id: null, notes: null, gem_bust: null,
         ...player,
+        // The first rank entered is the original assessment
+        original_cs_rank: player.original_cs_rank ?? player.cs_rank ?? null,
     });
 
     return db.prepare('SELECT * FROM scouted_players WHERE id = ?')
@@ -548,6 +632,13 @@ function addScoutedPlayer(player: Record<string, unknown>) {
 
 function updateScoutedPlayer(id: number, player: Record<string, unknown>) {
     if ('scout_id' in player) assertShortlistRoom(player.scout_id, id);
+
+    // A prospect ranked for the first time gets that rank as their original
+    if (player.cs_rank != null && !('original_cs_rank' in player)) {
+        const { original_cs_rank } = db.prepare('SELECT original_cs_rank FROM scouted_players WHERE id = ?')
+            .get(id) as { original_cs_rank: number | null };
+        if (original_cs_rank === null) player = { ...player, original_cs_rank: player.cs_rank };
+    }
 
     const fields = Object.keys(player)
         .map(key => `${key} = @${key}`)
@@ -564,6 +655,157 @@ function deleteScoutedPlayer(id: number) {
     db.prepare('DELETE FROM scouted_players WHERE id = ?').run(id);
 
     return { success: true };
+}
+
+// After the draft: clear the class. Optionally keep undrafted prospects (not taken) to
+// carry into next year's board, re-baselined to their current CS rank.
+function clearDraftClass(keepUndrafted: boolean) {
+    const tx = db.transaction(() => {
+        if (keepUndrafted) {
+            db.prepare('DELETE FROM scouted_players WHERE taken = 1').run();
+            db.prepare('UPDATE scouted_players SET original_cs_rank = cs_rank').run();
+        } else {
+            db.prepare('DELETE FROM scouted_players').run();
+        }
+    });
+    tx();
+    return getAllScoutedPlayers();
+}
+
+/**********************
+ * Contract Handlers *
+ **********************/
+function getAllCapCeilings() {
+    return db.prepare('SELECT * FROM cap_ceilings ORDER BY season').all();
+}
+
+// A null ceiling clears the season back to carrying the previous cap forward
+function saveCapCeiling(season: number, ceiling: number | null) {
+    if (ceiling === null) db.prepare('DELETE FROM cap_ceilings WHERE season = ?').run(season);
+    else db.prepare(`
+        INSERT INTO cap_ceilings (season, ceiling) VALUES (?, ?)
+        ON CONFLICT(season) DO UPDATE SET ceiling = excluded.ceiling
+    `).run(season, ceiling);
+    return getAllCapCeilings();
+}
+
+function getAllExtensions() {
+    return db.prepare('SELECT * FROM extensions').all();
+}
+
+// Upsert: one row of talks per player
+function saveExtension(extension: { player_id: number } & Record<string, unknown>) {
+    const row = {
+        fa_status: null, asking_aav: null, asking_years: null, offer_aav: null, offer_years: null,
+        offer_type: null, offer_clause: null, status: 'Negotiating', notes: null,
+        ...extension,
+    };
+    db.prepare(`
+        INSERT INTO extensions (
+            player_id, fa_status, asking_aav, asking_years, offer_aav, offer_years,
+            offer_type, offer_clause, status, notes
+        ) VALUES (
+            @player_id, @fa_status, @asking_aav, @asking_years, @offer_aav, @offer_years,
+            @offer_type, @offer_clause, @status, @notes
+        )
+        ON CONFLICT(player_id) DO UPDATE SET
+            fa_status = excluded.fa_status, asking_aav = excluded.asking_aav,
+            asking_years = excluded.asking_years, offer_aav = excluded.offer_aav,
+            offer_years = excluded.offer_years, offer_type = excluded.offer_type,
+            offer_clause = excluded.offer_clause, status = excluded.status, notes = excluded.notes
+    `).run(row);
+    return db.prepare('SELECT * FROM extensions WHERE player_id = ?').get(row.player_id);
+}
+
+function deleteExtension(playerID: number) {
+    db.prepare('DELETE FROM extensions WHERE player_id = ?').run(playerID);
+    return { success: true };
+}
+
+// The old deal has run out: the accepted extension becomes the player's contract
+function startExtension(playerID: number) {
+    const ext = db.prepare('SELECT * FROM extensions WHERE player_id = ?').get(playerID) as
+        { offer_aav: number | null; offer_years: number | null; offer_type: string | null; offer_clause: string | null; status: string } | undefined;
+    if (!ext || ext.status !== 'Accepted' || ext.offer_aav === null || ext.offer_years === null) {
+        throw new Error('No accepted extension to start');
+    }
+    const tx = db.transaction(() => {
+        db.prepare(`
+            UPDATE players SET aav = ?, years_remaining = ?, contract_type = ?, clause = ? WHERE id = ?
+        `).run(ext.offer_aav, ext.offer_years, ext.offer_type, ext.offer_clause, playerID);
+        db.prepare('DELETE FROM extensions WHERE player_id = ?').run(playerID);
+    });
+    tx();
+    return db.prepare('SELECT * FROM players WHERE id = ?').get(playerID);
+}
+
+function getAllFreeAgents() {
+    return db.prepare('SELECT * FROM free_agents ORDER BY last_name ASC, first_name ASC').all();
+}
+
+const FREE_AGENT_DEFAULTS = {
+    age: null, overall: null, potential_level: null, potential_chance: null, player_type: null,
+    role: null, fa_type: 'UFA', rights_team: null, asking_aav: null, asking_years: null,
+    offer_aav: null, offer_years: null, offer_type: null, offer_clause: null,
+    target_league: 'NHL', status: 'Shortlisted', notes: null,
+};
+
+function addFreeAgent(agent: Record<string, unknown>) {
+    const result = db.prepare(`
+        INSERT INTO free_agents (
+            first_name, last_name, position, age, overall, potential_level, potential_chance,
+            player_type, role, fa_type, rights_team, asking_aav, asking_years, offer_aav,
+            offer_years, offer_type, offer_clause, target_league, status, notes
+        ) VALUES (
+            @first_name, @last_name, @position, @age, @overall, @potential_level, @potential_chance,
+            @player_type, @role, @fa_type, @rights_team, @asking_aav, @asking_years, @offer_aav,
+            @offer_years, @offer_type, @offer_clause, @target_league, @status, @notes
+        )
+    `).run({ ...FREE_AGENT_DEFAULTS, ...agent });
+    return db.prepare('SELECT * FROM free_agents WHERE id = ?').get(result.lastInsertRowid);
+}
+
+function updateFreeAgent(id: number, agent: Record<string, unknown>) {
+    const fields = Object.keys(agent)
+        .map(key => `${key} = @${key}`)
+        .join(', ');
+    db.prepare(`UPDATE free_agents SET ${fields} WHERE id = @id`).run({ ...agent, id });
+    return db.prepare('SELECT * FROM free_agents WHERE id = ?').get(id);
+}
+
+function deleteFreeAgent(id: number) {
+    db.prepare('DELETE FROM free_agents WHERE id = ?').run(id);
+    return { success: true };
+}
+
+// An accepted offer: the free agent joins the roster on the offered terms
+function signFreeAgent(id: number) {
+    const fa = db.prepare('SELECT * FROM free_agents WHERE id = ?').get(id) as Record<string, any> | undefined;
+    if (!fa || fa.offer_aav === null || fa.offer_years === null) throw new Error('No offer to sign');
+    let player: unknown;
+    const tx = db.transaction(() => {
+        player = addPlayer({
+            ...INCOMING_PLAYER_DEFAULTS,
+            first_name: fa.first_name,
+            last_name: fa.last_name,
+            position: fa.position,
+            age: fa.age ?? 25,
+            roster_league: fa.target_league,
+            overall: fa.overall ?? 70,
+            potential_level: fa.potential_level ?? '',
+            potential_chance: fa.potential_chance ?? '',
+            player_type: fa.player_type ?? '',
+            role: fa.role ?? '',
+            aav: fa.offer_aav,
+            years_remaining: fa.offer_years,
+            contract_type: fa.offer_type,
+            clause: fa.offer_clause,
+            notes: fa.notes,
+        });
+        db.prepare('DELETE FROM free_agents WHERE id = ?').run(id);
+    });
+    tx();
+    return player;
 }
 
 /******************
@@ -676,6 +918,63 @@ function deleteTrade(id: number) {
     return { success: true };
 }
 
+/******************
+ * Draft Settings *
+ ******************/
+function getAllDraftSettings() {
+    return db.prepare('SELECT * FROM draft_settings ORDER BY season DESC').all();
+}
+
+function saveDraftSettings(settings: {
+    season: number;
+    class_quality: string | null;
+    class_roll: number | null;
+    prospect_quality: string | null;
+    prospect_roll: number | null;
+}) {
+    db.prepare(`
+        INSERT INTO draft_settings (season, class_quality, class_roll, prospect_quality, prospect_roll)
+        VALUES (@season, @class_quality, @class_roll, @prospect_quality, @prospect_roll)
+        ON CONFLICT(season) DO UPDATE SET
+            class_quality = excluded.class_quality,
+            class_roll = excluded.class_roll,
+            prospect_quality = excluded.prospect_quality,
+            prospect_roll = excluded.prospect_roll,
+            updated_at = datetime('now')
+    `).run(settings);
+    return db.prepare('SELECT * FROM draft_settings WHERE season = ?').get(settings.season);
+}
+
+/******************
+ * Team Standings *
+ ******************/
+function mapStanding(row: any) {
+    return row && { ...row, in_lottery: row.in_lottery === null ? null : !!row.in_lottery };
+}
+
+function getAllStandings() {
+    return db.prepare('SELECT * FROM team_standings ORDER BY season DESC, position').all().map(mapStanding);
+}
+
+function saveStanding(standing: {
+    season: number;
+    team_id: string;
+    position: number | null;
+    in_lottery: boolean | null;
+    lottery_pick: number | null;
+}) {
+    db.prepare(`
+        INSERT INTO team_standings (season, team_id, position, in_lottery, lottery_pick)
+        VALUES (@season, @team_id, @position, @in_lottery, @lottery_pick)
+        ON CONFLICT(season, team_id) DO UPDATE SET
+            position = excluded.position,
+            in_lottery = excluded.in_lottery,
+            lottery_pick = excluded.lottery_pick
+    `).run({ ...standing, in_lottery: standing.in_lottery === null ? null : standing.in_lottery ? 1 : 0 });
+    return mapStanding(db.prepare('SELECT * FROM team_standings WHERE season = ? AND team_id = ?')
+        .get(standing.season, standing.team_id));
+}
+
 /************************
  * Exported Handler Map *
  ************************/
@@ -708,6 +1007,10 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'trade:getAll': () => getAllTrades(),
     'trade:execute': (_: null, trade: Parameters<typeof executeTrade>[0]) => executeTrade(trade),
     'trade:delete': (_: null, id: number) => deleteTrade(id),
+    'draftSettings:getAll': () => getAllDraftSettings(),
+    'standings:getAll': () => getAllStandings(),
+    'standings:save': (_: null, standing: Parameters<typeof saveStanding>[0]) => saveStanding(standing),
+    'draftSettings:save': (_: null, settings: Parameters<typeof saveDraftSettings>[0]) => saveDraftSettings(settings),
     'scout:getAll': () => getAllScouts(),
     'scout:add': (_: null, scout: Record<string, unknown>) => addScout(scout),
     'scout:update': (_: null, id: number, scout: Record<string, unknown>) => updateScout(id, scout),
@@ -716,4 +1019,16 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'scoutedPlayer:add': (_: null, player: Record<string, unknown>) => addScoutedPlayer(player),
     'scoutedPlayer:update': (_: null, id: number, player: Record<string, unknown>) => updateScoutedPlayer(id, player),
     'scoutedPlayer:delete': (_: null, id: number) => deleteScoutedPlayer(id),
+    'scoutedPlayer:clearClass': (_: null, keepUndrafted: boolean) => clearDraftClass(keepUndrafted),
+    'capCeiling:getAll': () => getAllCapCeilings(),
+    'capCeiling:save': (_: null, season: number, ceiling: number | null) => saveCapCeiling(season, ceiling),
+    'extension:getAll': () => getAllExtensions(),
+    'extension:save': (_: null, extension: Parameters<typeof saveExtension>[0]) => saveExtension(extension),
+    'extension:delete': (_: null, playerID: number) => deleteExtension(playerID),
+    'extension:start': (_: null, playerID: number) => startExtension(playerID),
+    'freeAgent:getAll': () => getAllFreeAgents(),
+    'freeAgent:add': (_: null, agent: Record<string, unknown>) => addFreeAgent(agent),
+    'freeAgent:update': (_: null, id: number, agent: Record<string, unknown>) => updateFreeAgent(id, agent),
+    'freeAgent:delete': (_: null, id: number) => deleteFreeAgent(id),
+    'freeAgent:sign': (_: null, id: number) => signFreeAgent(id),
 }

@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { Franchise, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStatus, Trade, TradeRequest } from "@/types";
+import { AHL_CAP_EXEMPTION, CAP_CEILING } from "@/utils/league";
+import { CapCeiling, DraftSettings, Extension, Franchise, FreeAgent, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStanding, TeamStatus, Trade, TradeRequest } from "@/types";
 
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
@@ -24,7 +25,6 @@ export const usePlayerStore = defineStore('players', () => {
     const exemptContractCount = computed(() =>
         its.value.filter(player => player.aav > 0).length
     );
-    const AHL_CAP_EXEMPTION = 1.15;
     const nhlCapHit = computed(() => {
         const nhlHit = nhl.value.reduce((sum, p) => sum + p.aav, 0);
         const ahlOverage = ahl.value
@@ -204,7 +204,7 @@ export const useScoutStore = defineStore('scouts', () => {
         const result = await window.db['scout:getAll']();
         scouts.value = result as Scout[];
     }
-    async function add(scout: Omit<Scout, 'id'>) {
+    async function add(scout: Omit<Scout, 'id' | 'obligations_done'>) {
         const result = await window.db['scout:add'](scout) as Scout;
         scouts.value = [...scouts.value, result];
         return result;
@@ -257,7 +257,139 @@ export const useScoutedPlayerStore = defineStore('scoutedPlayers', () => {
         scoutedPlayers.value = scoutedPlayers.value.filter(p => p.id !== id);
     }
 
-    return { scoutedPlayers, forScout, load, add, update, remove };
+    // Season rollover: drop the drafted class (optionally keeping undrafted prospects)
+    async function clearClass(keepUndrafted: boolean) {
+        const result = await window.db['scoutedPlayer:clearClass'](keepUndrafted);
+        scoutedPlayers.value = result as ScoutedPlayer[];
+    }
+
+    return { scoutedPlayers, forScout, load, add, update, remove, clearClass };
+});
+
+export const useDraftSettingsStore = defineStore('draftSettings', () => {
+    const settings = ref<DraftSettings[]>([]);
+
+    async function load() {
+        const result = await window.db['draftSettings:getAll']();
+        settings.value = result as DraftSettings[];
+    }
+    const forSeason = (season: number) => settings.value.find(s => s.season === season) ?? null;
+
+    async function save(next: Omit<DraftSettings, 'updated_at'>) {
+        const saved = await window.db['draftSettings:save']({ ...next }) as DraftSettings;
+        settings.value = [saved, ...settings.value.filter(s => s.season !== saved.season)]
+            .sort((a, b) => b.season - a.season);
+        return saved;
+    }
+
+    return { settings, load, forSeason, save };
+});
+
+export const useStandingsStore = defineStore('standings', () => {
+    const standings = ref<TeamStanding[]>([]);
+
+    async function load() {
+        const result = await window.db['standings:getAll']();
+        standings.value = result as TeamStanding[];
+    }
+    const forTeam = (season: number, teamID: string) =>
+        standings.value.find(s => s.season === season && s.team_id === teamID) ?? null;
+
+    async function save(next: TeamStanding) {
+        const saved = await window.db['standings:save']({ ...next }) as TeamStanding;
+        standings.value = [
+            saved,
+            ...standings.value.filter(s => !(s.season === saved.season && s.team_id === saved.team_id)),
+        ];
+        return saved;
+    }
+
+    return { standings, load, forTeam, save };
+});
+
+// Salary cap per season. A season with no cap of its own uses the latest earlier one,
+// falling back to the default.
+export const useCapStore = defineStore('cap', () => {
+    const ceilings = ref<CapCeiling[]>([]);
+
+    const ceilingFor = (season: number) =>
+        ceilings.value.filter(c => c.season <= season).sort((a, b) => b.season - a.season)[0]?.ceiling ?? CAP_CEILING;
+    const isSet = (season: number) => ceilings.value.some(c => c.season === season);
+    const current = computed(() => ceilingFor(useFranchiseStore().franchise?.season ?? 25));
+
+    async function load() {
+        ceilings.value = await window.db['capCeiling:getAll']() as CapCeiling[];
+    }
+    async function save(season: number, ceiling: number | null) {
+        ceilings.value = await window.db['capCeiling:save'](season, ceiling) as CapCeiling[];
+    }
+
+    return { ceilings, ceilingFor, isSet, current, load, save };
+});
+
+export const useContractStore = defineStore('contracts', () => {
+    const extensions = ref<Extension[]>([]);
+    const freeAgents = ref<FreeAgent[]>([]);
+
+    const extensionFor = (playerID: number) => extensions.value.find(e => e.player_id === playerID) ?? null;
+
+    async function load() {
+        const [ext, fas] = await Promise.all([
+            window.db['extension:getAll'](),
+            window.db['freeAgent:getAll'](),
+        ]);
+        extensions.value = ext as Extension[];
+        freeAgents.value = fas as FreeAgent[];
+    }
+
+    async function saveExtension(extension: Extension) {
+        const saved = await window.db['extension:save']({ ...extension }) as Extension;
+        extensions.value = [...extensions.value.filter(e => e.player_id !== saved.player_id), saved];
+        return saved;
+    }
+    async function removeExtension(playerID: number) {
+        await window.db['extension:delete'](playerID);
+        extensions.value = extensions.value.filter(e => e.player_id !== playerID);
+    }
+    // The accepted extension replaces the player's current contract
+    async function startExtension(playerID: number) {
+        const player = await window.db['extension:start'](playerID) as Player;
+        extensions.value = extensions.value.filter(e => e.player_id !== playerID);
+        const playerStore = usePlayerStore();
+        const index = playerStore.players.findIndex(p => p.id === playerID);
+        if (index !== -1) playerStore.players[index] = player;
+        return player;
+    }
+
+    async function addFreeAgent(agent: Omit<FreeAgent, 'id' | 'created_at'>) {
+        const created = await window.db['freeAgent:add']({ ...agent }) as FreeAgent;
+        freeAgents.value = [...freeAgents.value, created];
+        return created;
+    }
+    async function updateFreeAgent(id: number, agent: Partial<FreeAgent>) {
+        const updated = await window.db['freeAgent:update'](id, { ...agent }) as FreeAgent;
+        const index = freeAgents.value.findIndex(f => f.id === id);
+        if (index !== -1) freeAgents.value[index] = updated;
+        return updated;
+    }
+    async function removeFreeAgent(id: number) {
+        await window.db['freeAgent:delete'](id);
+        freeAgents.value = freeAgents.value.filter(f => f.id !== id);
+    }
+    // Accepted offer: the free agent becomes a rostered player
+    async function signFreeAgent(id: number) {
+        const player = await window.db['freeAgent:sign'](id) as Player;
+        freeAgents.value = freeAgents.value.filter(f => f.id !== id);
+        const playerStore = usePlayerStore();
+        playerStore.players = [...playerStore.players, player];
+        return player;
+    }
+
+    return {
+        extensions, freeAgents, extensionFor,
+        load, saveExtension, removeExtension, startExtension,
+        addFreeAgent, updateFreeAgent, removeFreeAgent, signFreeAgent,
+    };
 });
 
 export const useTradeStore = defineStore('trades', () => {

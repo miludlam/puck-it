@@ -71,7 +71,7 @@ const form = reactive<Omit<Player, 'id' | 'created_at' | 'on_block'>>({
     overall: 75,
     potential_level: 'Top 6',
     potential_chance: 'Med',
-    player_type: 'TWF',
+    player_type: '',
     aav: 0,
     years_remaining: 0,
     contract_type: null,
@@ -147,7 +147,8 @@ async function remove() {
 
 watch(positionGroup, () => {
     form.potential_level = potentialLevelOptions.value[0];
-    form.player_type = playerTypeOptions.value[0];
+    // Keep the type if it's still valid (ENF works for F and D), otherwise clear it
+    if (form.player_type && !playerTypeOptions.value.includes(form.player_type)) form.player_type = '';
     form.position2 = null; // reset secondary position when group changes
 });
 </script>
@@ -219,6 +220,7 @@ watch(positionGroup, () => {
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Type</label>
                         <select v-model="form.player_type" :class="inputClass">
+                            <option value="">—</option>
                             <option v-for="type in playerTypeOptions" :key="type" :value="type">
                                 {{ type }}
                             </option>

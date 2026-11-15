@@ -8,8 +8,13 @@ const channels = [
     'pick:getAll', 'pick:getMy', 'pick:getTraded', 'pick:getAcquired',
     'pick:add', 'pick:update', 'pick:delete',
     'trade:getAll', 'trade:execute', 'trade:delete',
+    'draftSettings:getAll', 'draftSettings:save',
+    'standings:getAll', 'standings:save',
     'scout:getAll', 'scout:add', 'scout:update', 'scout:delete',
-    'scoutedPlayer:getAll', 'scoutedPlayer:add', 'scoutedPlayer:update', 'scoutedPlayer:delete',
+    'scoutedPlayer:getAll', 'scoutedPlayer:add', 'scoutedPlayer:update', 'scoutedPlayer:delete', 'scoutedPlayer:clearClass',
+    'capCeiling:getAll', 'capCeiling:save',
+    'extension:getAll', 'extension:save', 'extension:delete', 'extension:start',
+    'freeAgent:getAll', 'freeAgent:add', 'freeAgent:update', 'freeAgent:delete', 'freeAgent:sign',
 ];
 
 const api: Record<string, (...args: unknown[]) => Promise<unknown>> = {};

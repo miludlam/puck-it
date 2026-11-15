@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useFranchiseStore, usePickStore, usePlayerStore } from '@/stores';
+import { useCapStore, useFranchiseStore, usePickStore, usePlayerStore } from '@/stores';
 import { Pick, Player, TeamStatus } from '@/types';
 import { evaluateTradeBlock, statusSummary } from '@/utils/tradeBlock';
-import { CAP_CEILING, formatCap } from '@/utils/league';
+import { formatCap } from '@/utils/league';
 
 const emit = defineEmits<{ trade: [playerIds: number[], pickIds: number[]] }>();
 
@@ -20,7 +20,8 @@ const draftYear = computed(() => normalizeYear((franchiseStore.franchise?.season
 const myTeam = computed(() => franchiseStore.franchise?.team_id ?? null);
 const myPicks = computed(() => pickStore.picks.filter(p => p.current_owner === myTeam.value));
 
-const capSpace = computed(() => CAP_CEILING - playerStore.nhlCapHit);
+const capStore = useCapStore();
+const capSpace = computed(() => capStore.current - playerStore.nhlCapHit);
 
 const report = computed(() =>
     evaluateTradeBlock(playerStore.players, status.value, capSpace.value, myPicks.value, draftYear.value)

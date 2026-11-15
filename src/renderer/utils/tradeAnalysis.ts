@@ -1,7 +1,7 @@
 import { Player, Position, TeamStatus } from '@/types';
 import { analyzeRoster, groupOf, isNhlPotential, PIPELINE_TARGET, POTENTIAL_TIERS, TYPE_NAMES } from '@/utils/draftTargets';
 import { NHL_SLOTS } from '@/utils/tradeBlock';
-import { CAP_CEILING, formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
+import { formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
 
 const POSITIONS = Object.keys(NHL_SLOTS) as Position[];
 const VETERAN_AGE = 28;     // a rebuild sells players this age and up
@@ -26,6 +26,7 @@ export interface TradeAnalysisInput {
     status: TeamStatus;
     capBefore: number;          // NHL cap hit now
     capAfter: number;           // and after the trade
+    capCeiling: number;         // this season's cap
 }
 
 export type Verdict = 'Good' | 'Mixed' | 'Poor' | 'Neutral';
@@ -175,9 +176,9 @@ export function analyzeTrade(input: TradeAnalysisInput): TradeAnalysis {
     for (const p of input.outPicks) effect(`Gives up a ${pickText(p)}-round pick`, -pickValue(p.round) * w.picks * (status === 'Contender' ? 0.6 : 1));
 
     // Cap and contracts
-    const { capBefore: capWas, capAfter: capNow } = input;
-    if (capWas <= CAP_CEILING && capNow > CAP_CEILING) effect(`Puts you over the cap (${formatCap(capNow)} / ${formatCap(CAP_CEILING)})`, -3);
-    else if (capWas > CAP_CEILING && capNow <= CAP_CEILING) effect(`Gets you back under the cap (${formatCap(capNow)})`, 2);
+    const { capBefore: capWas, capAfter: capNow, capCeiling } = input;
+    if (capWas <= capCeiling && capNow > capCeiling) effect(`Puts you over the cap (${formatCap(capNow)} / ${formatCap(capCeiling)})`, -3);
+    else if (capWas > capCeiling && capNow <= capCeiling) effect(`Gets you back under the cap (${formatCap(capNow)})`, 2);
     else if (capWas - capNow >= 1) effect(`Frees ${formatCap(capWas - capNow)} in cap space`, status === 'Contender' ? 0.5 : 1);
     else if (capNow - capWas >= 1) effect(`Adds ${formatCap(capNow - capWas)} to the cap`, status === 'Rebuild' ? -1 : -0.25);
 
