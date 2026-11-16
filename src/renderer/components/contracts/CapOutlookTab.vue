@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useCapStore, useContractStore, useFranchiseStore, usePlayerStore } from '@/stores';
 import { capOutlook, OutlookYear, seasonLabel } from '@/utils/contracts';
-import { MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
+import { ahlCapExemption, formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
 
 const playerStore = usePlayerStore();
 const contractStore = useContractStore();
@@ -50,7 +50,7 @@ const committedRows: Row[] = [
     { label: 'Defence', value: y => money(y.nhl.DEF), indent: true, class: 'text-slate-400' },
     { label: 'Goalies', value: y => money(y.nhl.G), indent: true, class: 'text-slate-400' },
     { label: 'NHL', value: y => money(y.nhlTotal), class: 'text-slate-200' },
-    { label: 'Buried AHL', value: y => money(y.buried), class: 'text-slate-400', title: 'AHL salary above the $1.150M exemption' },
+    { label: 'Buried AHL', value: y => money(y.buried), class: 'text-slate-400', title: `AHL salary above the ${formatCap(ahlCapExemption())} exemption` },
     { label: 'Extensions & signings', value: y => money(y.extensions), class: 'text-sky-300', title: 'Accepted extensions (from the season after the current deal) and accepted free agents not yet signed' },
     { label: 'Committed', value: y => money(y.committed), class: 'text-slate-100 font-medium', divider: true },
 ];

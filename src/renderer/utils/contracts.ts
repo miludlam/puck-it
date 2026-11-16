@@ -1,10 +1,9 @@
 import { Extension, FAStatus, FreeAgent, League, Pick, Player, Position } from '@/types';
-import { AHL_CAP_EXEMPTION, CAP_CEILING, formatCap, MAX_CONTRACTS, MAX_ROSTER } from '@/utils/league';
+import { ahlCapExemption, CAP_CEILING, formatCap, MAX_CONTRACTS, MAX_ROSTER, minSalary } from '@/utils/league';
 import { NHL_SLOTS } from '@/utils/tradeBlock';
 
 export const OUTLOOK_YEARS = 8;
 export const UFA_AGE = 27;              // UFA at 27 (as of June 30 of the expiry year), else RFA
-export const MIN_SALARY = 0.775;        // $M
 export const MAX_SALARY_SHARE = 0.2;   // of the cap
 export const MAX_TERM_RESIGN = 8;       // re-signing your own player
 export const MAX_TERM_FA = 7;           // signing someone else's
@@ -12,7 +11,7 @@ export const MAX_TERM_FA = 7;           // signing someone else's
 // What a contract costs against the NHL cap where the player plays
 export function capCharge(league: League, aav: number): number {
     if (league === 'NHL') return aav;
-    if (league === 'AHL') return Math.max(0, aav - AHL_CAP_EXEMPTION);
+    if (league === 'AHL') return Math.max(0, aav - ahlCapExemption());
     return 0; // ITS players aren't on the cap
 }
 
@@ -227,7 +226,7 @@ export function offerImpact(input: OfferImpactInput): ImpactNote[] {
     // League limits (the max is a share of the cap in the deal's first season)
     const outlook = capOutlook(input);
     const maxSalary = (outlook[input.startOffset]?.cap ?? CAP_CEILING) * MAX_SALARY_SHARE;
-    if (aav < MIN_SALARY) notes.push({ tone: 'bad', text: `Below the ${formatCap(MIN_SALARY)} league minimum` });
+    if (aav < minSalary()) notes.push({ tone: 'bad', text: `Below the ${formatCap(minSalary())} league minimum` });
     if (aav > maxSalary) notes.push({ tone: 'bad', text: `Above the ${formatCap(maxSalary)} max (20% of the cap)` });
     const maxTerm = input.isNewContract ? MAX_TERM_FA : MAX_TERM_RESIGN;
     if (years > maxTerm) notes.push({ tone: 'bad', text: `Longer than the ${maxTerm}-year max term` });

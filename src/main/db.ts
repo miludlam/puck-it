@@ -11,8 +11,11 @@ const MIGRATIONS: (() => void)[] = [
     () => db.exec("ALTER TABLE franchise ADD COLUMN name TEXT DEFAULT NULL"), // 2: franchise names
     // 3: salary retained in trades, counted against each season's cap
     () => db.exec("CREATE TABLE retained_salary (season INTEGER PRIMARY KEY, amount REAL NOT NULL)"),
+    // 4: the game edition, whose salary rules differ; franchises from before it are NHL 26
+    () => db.exec("ALTER TABLE franchise ADD COLUMN game INTEGER NOT NULL DEFAULT 26"),
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
+export const LATEST_GAME = 27; // new franchises start on this edition
 
 export class NewerFileError extends Error {}
 
@@ -476,6 +479,11 @@ function updateFranchise(teamID: string, season: number) {
 
 function setTeamStatus(status: string) {
     db.prepare('UPDATE franchise SET team_status = ? WHERE id = 1').run(status);
+    return getFranchise();
+}
+
+function setFranchiseGame(game: number) {
+    db.prepare('UPDATE franchise SET game = ? WHERE id = 1').run(game);
     return getFranchise();
 }
 
@@ -1079,6 +1087,7 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'franchise:update': (_: null, teamID: string, season: number) => updateFranchise(teamID, season),
     'franchise:setStatus': (_: null, status: string) => setTeamStatus(status),
     'franchise:rename': (_: null, name: string | null) => renameFranchise(name),
+    'franchise:setGame': (_: null, game: number) => setFranchiseGame(game),
     'franchise:advanceSeason': () => advanceSeason(),
     'pick:getAll': () => getAllPicks(),
     'pick:getMy': (_: null, teamID: string) => getMyPicks(teamID),

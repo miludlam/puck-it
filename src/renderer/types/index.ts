@@ -1,6 +1,9 @@
 // Position Types
 export type Position = 'C' | 'LW' | 'RW' | 'LD' | 'RD' | 'G';
 
+// Game edition; salary rules differ between them (utils/league)
+export type Game = 26 | 27;
+
 // League Types
 export type League = 'NHL' | 'AHL' | 'ITS';
 export type JuniorLeague = 'OHL' | 'QMJHL' | 'WHL' | // Canada
@@ -101,6 +104,7 @@ export interface Franchise {
     team_id: string | null;
     season: number;
     team_status: TeamStatus;
+    game: Game;
     created_at: string;
 }
 

@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
-import { AHL_CAP_EXEMPTION, CAP_CEILING } from "@/utils/league";
-import { CapCeiling, RetainedSalary, DraftSettings, Extension, Franchise, FreeAgent, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStanding, TeamStatus, Trade, TradeRequest } from "@/types";
+import { computed, ref, watch } from "vue";
+import { ahlCapExemption, CAP_CEILING, game } from "@/utils/league";
+import { CapCeiling, RetainedSalary, DraftSettings, Extension, Franchise, FreeAgent, Game, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStanding, TeamStatus, Trade, TradeRequest } from "@/types";
 
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
@@ -28,8 +28,8 @@ export const usePlayerStore = defineStore('players', () => {
     const nhlCapHit = computed(() => {
         const nhlHit = nhl.value.reduce((sum, p) => sum + p.aav, 0);
         const ahlOverage = ahl.value
-            .filter(p => p.aav > AHL_CAP_EXEMPTION)
-            .reduce((sum, p) => sum + (p.aav - AHL_CAP_EXEMPTION), 0);
+            .filter(p => p.aav > ahlCapExemption())
+            .reduce((sum, p) => sum + (p.aav - ahlCapExemption()), 0);
         return nhlHit + ahlOverage;
     });
     const nhlRosterCount = computed(() =>
@@ -125,6 +125,8 @@ export const useFranchiseStore = defineStore('franchise', () => {
     const currentTeam = computed(() =>
         teams.value.find(team => team.id === franchise.value?.team_id) ?? null
     );
+    watch(() => franchise.value?.game, g => { if (g) game.value = g; });
+
     const formattedSeason = computed(() => {
         const year = franchise.value?.season ?? 25;
         return `${year}/${String(year + 1).slice(-2)}`;
@@ -151,11 +153,15 @@ export const useFranchiseStore = defineStore('franchise', () => {
         const result = await window.db['franchise:rename'](name);
         franchise.value = result as Franchise;
     }
+    async function setGame(edition: Game) {
+        const result = await window.db['franchise:setGame'](edition);
+        franchise.value = result as Franchise;
+    }
 
     return {
         franchise, teams,
         currentTeam, formattedSeason,
-        load, loadTeams, update, setStatus, rename,
+        load, loadTeams, update, setStatus, rename, setGame,
     };
 });
 

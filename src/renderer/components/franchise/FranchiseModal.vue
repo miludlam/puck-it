@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useFranchiseStore } from '@/stores';
+import { Game } from '@/types';
+import { GAMES } from '@/utils/league';
 
 const franchiseStore = useFranchiseStore();
 
 const season = ref<number>(franchiseStore.franchise?.season ?? 25);
 const selectedTeamID = ref<string | null>(franchiseStore.franchise?.team_id ?? null);
 const name = ref(franchiseStore.franchise?.name ?? '');
+const game = ref<Game>(franchiseStore.franchise?.game ?? 27);
 
 // CSS constants
 const inputClass = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500";
@@ -20,6 +23,7 @@ async function save() {
     if (selectedTeamID.value && season.value) {
         await franchiseStore.update(selectedTeamID.value, season.value);
         if ((name.value.trim() || null) !== franchiseStore.franchise?.name) await franchiseStore.rename(name.value);
+        if (game.value !== franchiseStore.franchise?.game) await franchiseStore.setGame(game.value);
         emit('close');
     }
 }
@@ -50,6 +54,13 @@ async function save() {
                             :placeholder="franchiseStore.teams.find(t => t.id === selectedTeamID)?.name ?? 'Optional'"
                             :class="inputClass"
                         />
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs text-slate-400 mb-1">Game</label>
+                        <select v-model.number="game" :class="inputClass">
+                            <option v-for="g in GAMES" :key="g" :value="g">NHL {{ g }}</option>
+                        </select>
+                        <p class="mt-1 text-xs text-slate-500">Sets the minimum salary and buried AHL exemption to match that game.</p>
                     </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Team</label>

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { app, BrowserWindow, dialog, IpcMainInvokeEvent, shell } from 'electron';
-import { dbHandlers, openDB, SCHEMA_VERSION } from './db';
+import { dbHandlers, LATEST_GAME, openDB, SCHEMA_VERSION } from './db';
 
 // Each franchise is its own database file in userData/franchises. settings.json remembers
 // which one was open last. Backups made before a schema update go in franchises/backups.
@@ -132,6 +132,7 @@ function list(): FranchiseFile[] {
 function create(name: string | null) {
     open(newFileName());
     dbHandlers['franchise:rename'](null, name);
+    dbHandlers['franchise:setGame'](null, LATEST_GAME);
 }
 
 function switchTo(file: string) {
