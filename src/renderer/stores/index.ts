@@ -64,6 +64,9 @@ export const usePlayerStore = defineStore('players', () => {
         await window.db['player:clearAll']();
         players.value = [];
     }
+    async function importAll(rows: Omit<Player, 'id' | 'created_at' | 'on_block'>[], replace: boolean) {
+        players.value = await window.db['player:import'](rows, replace) as Player[];
+    }
     async function assignSlot(
         playerID: number,
         toSlot: string | null,
@@ -109,7 +112,7 @@ export const usePlayerStore = defineStore('players', () => {
         players,
         nhl, ahl, its,
         contractCount, exemptContractCount, nhlCapHit, nhlRosterCount,
-        load, add, update, remove, assignSlot, clearLines, clearAll,
+        load, add, update, remove, assignSlot, clearLines, clearAll, importAll,
     };
 });
 
@@ -223,8 +226,11 @@ export const useScoutStore = defineStore('scouts', () => {
         await window.db['scout:delete'](id);
         scouts.value = scouts.value.filter(s => s.id !== id);
     }
+    async function importAll(rows: Omit<Scout, 'id' | 'obligations_done'>[], replace: boolean) {
+        scouts.value = await window.db['scout:import'](rows, replace) as Scout[];
+    }
 
-    return { scouts, hired, offered, regionOf, load, add, update, remove };
+    return { scouts, hired, offered, regionOf, load, add, update, remove, importAll };
 });
 
 export const useScoutedPlayerStore = defineStore('scoutedPlayers', () => {

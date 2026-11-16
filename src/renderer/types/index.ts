@@ -13,7 +13,7 @@ export type JuniorLeague = 'OHL' | 'QMJHL' | 'WHL' | // Canada
 export type ForwardPotentialLevel = 'Top 6' | 'Top 9' | 'Bottom 6'|
     'AHL Top 6' | 'AHL Bottom 6' | 'AHL 4th Line' | 'AHL Extra' | 'AHL Other';
 export type DefensePotentialLevel = 'Top 4' | 'Top 6' | '7th' |
-    'AHL Top 2' | 'AHL Top 4' | 'AHL Top 6' | 'AHL 7th' | 'AHL Other';
+    'AHL Top 2' | 'AHL Top 4' | 'AHL Top 6' | 'AHL 7th' | 'AHL Extra' | 'AHL Other';
 export type GoaliePotentialLevel = 'Starter' | 'Fringe' | 'Backup' |
     'AHL Starter' | 'AHL Fringe' | 'AHL Backup' | 'AHL Extra' | 'AHL Other';
 export type PotentialLevel = 'Franchise' | 'Elite' | ForwardPotentialLevel | DefensePotentialLevel | GoaliePotentialLevel;
@@ -322,6 +322,9 @@ export interface FreeAgent extends ContractTerms {
 
 // Max prospects on one scout's shortlist (mirrors the main-process check)
 export const SHORTLIST_MAX = 50;
+
+// Max hired scouts on staff
+export const MAX_SCOUTS = 20;
 
 declare global {
     interface Window {

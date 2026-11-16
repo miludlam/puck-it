@@ -7,15 +7,15 @@ export const groupOf = (position: Position): Group =>
 
 const POSITIONS: Position[] = ['C', 'LW', 'RW', 'LD', 'RD', 'G'];
 
-// Potential tiers per position group, best first (same lists as the player forms)
+// Potential tiers per position group, best first. The player forms, filters and sorting all use these.
 export const POTENTIAL_TIERS: Record<Group, PotentialLevel[]> = {
     FWD: ['Franchise', 'Elite', 'Top 6', 'Top 9', 'Bottom 6', 'AHL Top 6', 'AHL Bottom 6', 'AHL 4th Line', 'AHL Extra', 'AHL Other'],
-    DEF: ['Franchise', 'Elite', 'Top 4', 'Top 6', '7th', 'AHL Top 2', 'AHL Top 4', 'AHL Top 6', 'AHL 7th', 'AHL Other'],
+    DEF: ['Franchise', 'Elite', 'Top 4', 'Top 6', '7th', 'AHL Top 2', 'AHL Top 4', 'AHL Top 6', 'AHL 7th', 'AHL Extra', 'AHL Other'],
     G:   ['Franchise', 'Elite', 'Starter', 'Fringe', 'Backup', 'AHL Starter', 'AHL Fringe', 'AHL Backup', 'AHL Extra', 'AHL Other'],
 };
 
 // Value of each tier index: Franchise/Elite dominate, NHL tiers next, AHL tiers barely register
-const TIER_VALUE = [10, 9, 7, 5, 3, 1, 1, 1, 1, 1];
+const TIER_VALUE = [10, 9, 7, 5, 3, 1, 1, 1, 1, 1, 1];
 
 // How much to trust a potential reading
 const CHANCE_FACTOR: Record<PotentialChance, number> = { Exact: 1, High: 0.9, Med: 0.75, Low: 0.55 };

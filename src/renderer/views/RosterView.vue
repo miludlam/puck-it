@@ -5,6 +5,7 @@ import { usePlayerStore } from "@/stores";
 import AllPlayersTable from '@/components/roster/AllPlayersTable.vue';
 import LineBuilder from '@/components/roster/LineBuilder.vue';
 import PlayerModal from '@/components/roster/PlayerModal.vue';
+import ImportModal from '@/components/ImportModal.vue';
 
 type RosterTab = 'all' | 'nhl' | 'ahl' | 'its';
 const activeTab = ref<RosterTab>('all');
@@ -14,6 +15,7 @@ const playerStore = usePlayerStore();
 const showModal = ref(false);
 const selectedPlayer = ref<Player | undefined>(undefined);
 const confirmClear = ref(false);
+const showImport = ref(false);
 
 async function onClearRoster() {
     if (!confirmClear.value) {
@@ -82,6 +84,10 @@ const itsByGroup = computed(() => {
                         class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
                         @click="onClearRoster"
                     >Clear Roster</button>
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                        @click="showImport = true"
+                    >Import…</button>
                     <button
                         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                         :style="{ backgroundColor: 'var(--team-primary)', color: 'var(--team-on-primary)' }"
@@ -158,5 +164,6 @@ const itsByGroup = computed(() => {
             @close="onClose"
             @saved="onClose"
         />
+        <ImportModal v-if="showImport" kind="players" @close="showImport = false" />
     </div>
 </template>

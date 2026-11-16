@@ -413,6 +413,15 @@ function clearAllPlayers() {
     return { success: true };
 }
 
+// Bulk import from CSV: all rows or none. Replacing clears the roster first (extensions go with it).
+function importPlayers(players: Record<string, unknown>[], replace: boolean) {
+    db.transaction(() => {
+        if (replace) clearAllPlayers();
+        for (const player of players) addPlayer(player);
+    })();
+    return getAllPlayers();
+}
+
 function assignSlot(
     playerID: number,
     toSlot: string | null,
@@ -628,6 +637,16 @@ function deleteScout(id: number) {
     db.prepare('DELETE FROM scouts WHERE id = ?').run(id);
 
     return { success: true };
+}
+
+// Bulk import: all rows or none. Replacing removes existing scouts; their shortlisted
+// prospects stay on the Board without a scout.
+function importScouts(scouts: Record<string, unknown>[], replace: boolean) {
+    db.transaction(() => {
+        if (replace) db.prepare('DELETE FROM scouts').run();
+        for (const scout of scouts) addScout(scout);
+    })();
+    return getAllScouts();
 }
 
 /****************************
@@ -1030,6 +1049,7 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'player:update': (_: null, id: number, player: Record<string, unknown>) => updatePlayer(id, player),
     'player:delete': (_: null, id: number) => deletePlayer(id),
     'player:clearAll': () => clearAllPlayers(),
+    'player:import': (_: null, players: Record<string, unknown>[], replace: boolean) => importPlayers(players, replace),
     'player:assignSlot': (
         _: null,
         playerID: number,
@@ -1062,6 +1082,7 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'scout:add': (_: null, scout: Record<string, unknown>) => addScout(scout),
     'scout:update': (_: null, id: number, scout: Record<string, unknown>) => updateScout(id, scout),
     'scout:delete': (_: null, id: number) => deleteScout(id),
+    'scout:import': (_: null, scouts: Record<string, unknown>[], replace: boolean) => importScouts(scouts, replace),
     'scoutedPlayer:getAll': () => getAllScoutedPlayers(),
     'scoutedPlayer:add': (_: null, player: Record<string, unknown>) => addScoutedPlayer(player),
     'scoutedPlayer:update': (_: null, id: number, player: Record<string, unknown>) => updateScoutedPlayer(id, player),

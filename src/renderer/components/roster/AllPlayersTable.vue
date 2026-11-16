@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { POTENTIAL_TIERS } from '@/utils/draftTargets';
 import { computed, ref, Ref } from "vue";
 import { usePlayerStore } from "@/stores";
 import { League, Player, PlayerStatus, Position } from "@/types";
@@ -42,18 +43,9 @@ interface SortField {
     direction: SortDirection;
 }
 
-const forwardPotentialRank: Record<string, number> = {
-    'Franchise': 0, 'Elite': 1, 'Top 6': 2, 'Top 9': 3, 'Bottom 6': 4,
-    'AHL Top 6': 5, 'AHL Bottom 6': 6, 'AHL 4th Line': 7, 'AHL Extra': 8, 'AHL Other': 9,
-};
-const defensePotentialRank: Record<string, number> = {
-    'Franchise': 0, 'Elite': 1, 'Top 4': 2, 'Top 6': 3, '7th': 4,
-    'AHL Top 2': 5, 'AHL Top 4': 6, 'AHL Top 6': 7, 'AHL 7th': 8, 'AHL Other': 9,
-};
-const goaliePotentialRank: Record<string, number> = {
-    'Franchise': 0, 'Elite': 1, 'Starter': 2, 'Fringe': 3, 'Backup': 4,
-    'AHL Starter': 5, 'AHL Fringe': 6, 'AHL Backup': 7, 'AHL Extra': 8, 'AHL Other': 9,
-};
+const forwardPotentialRank = Object.fromEntries(POTENTIAL_TIERS.FWD.map((level, i) => [level, i])) as Record<string, number>;
+const defensePotentialRank = Object.fromEntries(POTENTIAL_TIERS.DEF.map((level, i) => [level, i])) as Record<string, number>;
+const goaliePotentialRank = Object.fromEntries(POTENTIAL_TIERS.G.map((level, i) => [level, i])) as Record<string, number>;
 const potentialChanceRank: Record<string, number> = {
     'High': 0, 'Med': 1, 'Low': 2, 'Exact': 3
 };

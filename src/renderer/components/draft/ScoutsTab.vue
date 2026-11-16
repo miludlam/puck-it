@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useScoutedPlayerStore, useScoutStore } from '@/stores';
-import { JuniorLeague, Scout, ScoutRating, ScoutStatus, SHORTLIST_MAX } from '@/types';
+import { JuniorLeague, MAX_SCOUTS, Scout, ScoutRating, ScoutStatus, SHORTLIST_MAX } from '@/types';
 import ScoutModal from '@/components/draft/ScoutModal.vue';
+import ImportModal from '@/components/ImportModal.vue';
 import ShortlistPlayerModal from '@/components/draft/ShortlistPlayerModal.vue';
 import LockIcon from '@/components/LockIcon.vue';
 import ScoutPhases from '@/components/draft/ScoutPhases.vue';
@@ -17,7 +18,7 @@ const shortlistScoutId = ref<number | null | undefined>(undefined);
 const showModal = ref(false);
 const selectedScout = ref<Scout | undefined>(undefined);
 
-const MAX_SCOUTS = 20;
+const showImport = ref(false);
 const canAdd = computed(() => scoutStore.hired.length < MAX_SCOUTS);
 
 const allotmentRegions = Object.keys(ALLOTMENT) as JuniorLeague[];
@@ -328,6 +329,10 @@ const offloadSuggestions = computed(() =>
                     class="px-4 py-2 rounded-lg text-sm font-medium border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
                     @click="openAdd('offered')"
                 >+ Offer Contract</button>
+                <button
+                    class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                    @click="showImport = true"
+                >Import…</button>
                 <button
                     v-if="canAdd"
                     class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
@@ -761,6 +766,7 @@ const offloadSuggestions = computed(() =>
             @close="shortlistScoutId = undefined"
         />
 
+        <ImportModal v-if="showImport" kind="scouts" @close="showImport = false" />
         <ScoutModal v-if="showModal" :scout="selectedScout" :status="newScoutStatus" @close="onClose" @saved="onClose" />
     </div>
 </template>

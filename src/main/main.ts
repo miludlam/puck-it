@@ -31,7 +31,8 @@ function createWindow() {
 
     if (isDev) {
         win.loadURL('http://localhost:5173');
-        win.webContents.openDevTools();
+        // Opt in with DEVTOOLS=1; otherwise open them with Cmd+Option+I when needed
+        if (process.env.DEVTOOLS) win.webContents.openDevTools();
     } else {
         win.loadFile(path.join(__dirname, '../renderer/index.html'));
     }

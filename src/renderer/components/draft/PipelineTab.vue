@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { POTENTIAL_TIERS } from '@/utils/draftTargets';
 import { computed } from 'vue';
 import { usePlayerStore } from '@/stores';
 import { Player, PotentialLevel } from '@/types';
@@ -13,18 +14,9 @@ function group(p: Player): PositionGroup {
     return 'G';
 }
 
-const fwdPotentials: PotentialLevel[] = [
-    'Franchise', 'Elite', 'Top 6', 'Top 9', 'Bottom 6',
-    'AHL Top 6', 'AHL Bottom 6', 'AHL 4th Line', 'AHL Extra', 'AHL Other',
-];
-const defPotentials: PotentialLevel[] = [
-    'Franchise', 'Elite', 'Top 4', 'Top 6', '7th',
-    'AHL Top 2', 'AHL Top 4', 'AHL Top 6', 'AHL 7th', 'AHL Other',
-];
-const goaliePotentials: PotentialLevel[] = [
-    'Franchise', 'Elite', 'Starter', 'Fringe', 'Backup',
-    'AHL Starter', 'AHL Fringe', 'AHL Backup', 'AHL Extra', 'AHL Other',
-];
+const fwdPotentials: PotentialLevel[] = POTENTIAL_TIERS.FWD;
+const defPotentials: PotentialLevel[] = POTENTIAL_TIERS.DEF;
+const goaliePotentials: PotentialLevel[] = POTENTIAL_TIERS.G;
 
 const sections: { label: string; group: PositionGroup; potentials: PotentialLevel[] }[] = [
     { label: 'Forwards',  group: 'FWD', potentials: fwdPotentials    },

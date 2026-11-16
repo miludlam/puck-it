@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { POTENTIAL_TIERS } from '@/utils/draftTargets';
 import { computed, reactive, ref, watch } from "vue";
 import {
     Clause,
@@ -16,18 +17,9 @@ import { usePlayerStore } from '@/stores';
 
 const playerStore = usePlayerStore();
 
-const forwardPotentialLevels: PotentialLevel[] = [
-    'Franchise', 'Elite', 'Top 6', 'Top 9', 'Bottom 6',
-    'AHL Top 6', 'AHL Bottom 6', 'AHL 4th Line', 'AHL Extra', 'AHL Other',
-];
-const defensePotentialLevels: PotentialLevel[] = [
-    'Franchise', 'Elite', 'Top 4', 'Top 6', '7th',
-    'AHL Top 2', 'AHL Top 4', 'AHL Top 6', 'AHL 7th', 'AHL Other',
-];
-const goaliePotentialLevels: PotentialLevel[] = [
-    'Franchise', 'Elite', 'Starter', 'Fringe', 'Backup',
-    'AHL Starter', 'AHL Fringe', 'AHL Backup', 'AHL Extra', 'AHL Other',
-];
+const forwardPotentialLevels: PotentialLevel[] = POTENTIAL_TIERS.FWD;
+const defensePotentialLevels: PotentialLevel[] = POTENTIAL_TIERS.DEF;
+const goaliePotentialLevels: PotentialLevel[] = POTENTIAL_TIERS.G;
 const potentialChance: PotentialChance[] = ['Exact', 'High', 'Med', 'Low'];
 
 const forwardPlayerTypes: PlayerType[] = ['ENF', 'GRN', 'PLY', 'PWF', 'SNP', 'TWF'];
