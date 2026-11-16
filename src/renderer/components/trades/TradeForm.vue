@@ -18,6 +18,8 @@ const playerStore = usePlayerStore();
 const pickStore = usePickStore();
 const tradeStore = useTradeStore();
 const capStore = useCapStore();
+// What our contracts can take up this season once retained salary is counted
+const capLimit = computed(() => capStore.current - capStore.currentRetained);
 
 const inputClass = "bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-sky-500";
 const sectionHeader = "text-xs font-medium text-slate-500 uppercase tracking-wider mb-2";
@@ -67,7 +69,7 @@ const blockReasons = computed(() => {
     const report = evaluateTradeBlock(
         playerStore.players,
         franchiseStore.franchise?.team_status ?? 'Bubble',
-        capStore.current - playerStore.nhlCapHit,
+        capLimit.value - playerStore.nhlCapHit,
         myPicks.value,
         draftYear.value,
     );
@@ -187,7 +189,7 @@ const analysis = computed(() => {
         status: franchiseStore.franchise?.team_status ?? 'Bubble',
         capBefore: playerStore.nhlCapHit,
         capAfter: impact.value.capHit,
-        capCeiling: capStore.current,
+        capCeiling: capLimit.value,
     });
 });
 
@@ -222,7 +224,7 @@ const problems = computed(() => {
 });
 const warnings = computed(() => {
     const list: string[] = [];
-    if (impact.value.capHit > capStore.current) list.push(`Over the cap after this trade (${formatCap(impact.value.capHit)})`);
+    if (impact.value.capHit > capLimit.value) list.push(`Over the cap after this trade (${formatCap(impact.value.capHit)})`);
     if (impact.value.contracts > MAX_CONTRACTS) list.push(`${impact.value.contracts} contracts — over the ${MAX_CONTRACTS} limit`);
     if (impact.value.exempt > MAX_EXEMPT_CONTRACTS) list.push(`${impact.value.exempt} exempt contracts — over ${MAX_EXEMPT_CONTRACTS}`);
     for (const p of outPlayers.value) if (p.clause) list.push(`${p.last_name} has a ${p.clause}`);
@@ -284,8 +286,8 @@ const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.na
             <div class="flex flex-wrap gap-x-8 gap-y-1 text-xs text-slate-400">
                 <span>
                     NHL cap: {{ impact.capDelta >= 0 ? '+' : '−' }}{{ formatCap(Math.abs(impact.capDelta)) }}
-                    → <span :class="impact.capHit > capStore.current ? 'text-rose-400' : 'text-slate-200'">{{ formatCap(impact.capHit) }}</span>
-                    / {{ formatCap(capStore.current) }}
+                    → <span :class="impact.capHit > capLimit ? 'text-rose-400' : 'text-slate-200'">{{ formatCap(impact.capHit) }}</span>
+                    / {{ formatCap(capStore.current) }}<template v-if="capStore.currentRetained"> ({{ formatCap(capStore.currentRetained) }} retained)</template>
                 </span>
                 <span>Contracts: <span :class="impact.contracts > MAX_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.contracts }}</span> / {{ MAX_CONTRACTS }}</span>
                 <span>Exempt: <span :class="impact.exempt > MAX_EXEMPT_CONTRACTS ? 'text-rose-400' : 'text-slate-200'">{{ impact.exempt }}</span> / {{ MAX_EXEMPT_CONTRACTS }}</span>

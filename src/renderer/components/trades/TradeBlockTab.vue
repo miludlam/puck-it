@@ -21,7 +21,7 @@ const myTeam = computed(() => franchiseStore.franchise?.team_id ?? null);
 const myPicks = computed(() => pickStore.picks.filter(p => p.current_owner === myTeam.value));
 
 const capStore = useCapStore();
-const capSpace = computed(() => capStore.current - playerStore.nhlCapHit);
+const capSpace = computed(() => capStore.current - capStore.currentRetained - playerStore.nhlCapHit);
 
 const report = computed(() =>
     evaluateTradeBlock(playerStore.players, status.value, capSpace.value, myPicks.value, draftYear.value)

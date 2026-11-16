@@ -13,7 +13,7 @@ const channels = [
     'standings:getAll', 'standings:save',
     'scout:getAll', 'scout:add', 'scout:update', 'scout:delete', 'scout:import',
     'scoutedPlayer:getAll', 'scoutedPlayer:add', 'scoutedPlayer:update', 'scoutedPlayer:delete', 'scoutedPlayer:clearClass',
-    'capCeiling:getAll', 'capCeiling:save',
+    'capCeiling:getAll', 'capCeiling:save', 'retained:getAll', 'retained:save',
     'extension:getAll', 'extension:save', 'extension:delete', 'extension:start',
     'freeAgent:getAll', 'freeAgent:add', 'freeAgent:update', 'freeAgent:delete', 'freeAgent:sign',
 ];

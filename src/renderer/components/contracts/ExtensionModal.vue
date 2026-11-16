@@ -49,6 +49,7 @@ const impact = computed(() => offerImpact({
     freeAgents: contractStore.freeAgents,
     season: season.value,
     ceilingFor: capStore.ceilingFor,
+    retainedFor: capStore.retainedFor,
     excludePlayerId: props.player.id,
     aav: num(form.offer_aav),
     years: num(form.offer_years),

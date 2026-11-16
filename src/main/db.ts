@@ -9,6 +9,8 @@ let db: Database.Database;
 const MIGRATIONS: (() => void)[] = [
     baselineSchema, // 1: everything before the franchise library; its checks catch older files up
     () => db.exec("ALTER TABLE franchise ADD COLUMN name TEXT DEFAULT NULL"), // 2: franchise names
+    // 3: salary retained in trades, counted against each season's cap
+    () => db.exec("CREATE TABLE retained_salary (season INTEGER PRIMARY KEY, amount REAL NOT NULL)"),
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
@@ -754,6 +756,20 @@ function saveCapCeiling(season: number, ceiling: number | null) {
     return getAllCapCeilings();
 }
 
+function getAllRetainedSalary() {
+    return db.prepare('SELECT * FROM retained_salary ORDER BY season').all();
+}
+
+// A null or zero amount clears the season
+function saveRetainedSalary(season: number, amount: number | null) {
+    if (!amount) db.prepare('DELETE FROM retained_salary WHERE season = ?').run(season);
+    else db.prepare(`
+        INSERT INTO retained_salary (season, amount) VALUES (?, ?)
+        ON CONFLICT(season) DO UPDATE SET amount = excluded.amount
+    `).run(season, amount);
+    return getAllRetainedSalary();
+}
+
 function getAllExtensions() {
     return db.prepare('SELECT * FROM extensions').all();
 }
@@ -1090,6 +1106,8 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'scoutedPlayer:clearClass': (_: null, keepUndrafted: boolean) => clearDraftClass(keepUndrafted),
     'capCeiling:getAll': () => getAllCapCeilings(),
     'capCeiling:save': (_: null, season: number, ceiling: number | null) => saveCapCeiling(season, ceiling),
+    'retained:getAll': () => getAllRetainedSalary(),
+    'retained:save': (_: null, season: number, amount: number | null) => saveRetainedSalary(season, amount),
     'extension:getAll': () => getAllExtensions(),
     'extension:save': (_: null, extension: Parameters<typeof saveExtension>[0]) => saveExtension(extension),
     'extension:delete': (_: null, playerID: number) => deleteExtension(playerID),

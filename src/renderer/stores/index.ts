@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { AHL_CAP_EXEMPTION, CAP_CEILING } from "@/utils/league";
-import { CapCeiling, DraftSettings, Extension, Franchise, FreeAgent, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStanding, TeamStatus, Trade, TradeRequest } from "@/types";
+import { CapCeiling, RetainedSalary, DraftSettings, Extension, Franchise, FreeAgent, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStanding, TeamStatus, Trade, TradeRequest } from "@/types";
 
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
@@ -321,20 +321,31 @@ export const useStandingsStore = defineStore('standings', () => {
 // falling back to the default.
 export const useCapStore = defineStore('cap', () => {
     const ceilings = ref<CapCeiling[]>([]);
+    const retained = ref<RetainedSalary[]>([]);
 
     const ceilingFor = (season: number) =>
         ceilings.value.filter(c => c.season <= season).sort((a, b) => b.season - a.season)[0]?.ceiling ?? CAP_CEILING;
     const isSet = (season: number) => ceilings.value.some(c => c.season === season);
     const current = computed(() => ceilingFor(useFranchiseStore().franchise?.season ?? 25));
 
+    // Retained salary doesn't carry forward; each season is entered on its own
+    const retainedFor = (season: number) => retained.value.find(r => r.season === season)?.amount ?? 0;
+    const currentRetained = computed(() => retainedFor(useFranchiseStore().franchise?.season ?? 25));
+
     async function load() {
-        ceilings.value = await window.db['capCeiling:getAll']() as CapCeiling[];
+        [ceilings.value, retained.value] = await Promise.all([
+            window.db['capCeiling:getAll']() as Promise<CapCeiling[]>,
+            window.db['retained:getAll']() as Promise<RetainedSalary[]>,
+        ]);
     }
     async function save(season: number, ceiling: number | null) {
         ceilings.value = await window.db['capCeiling:save'](season, ceiling) as CapCeiling[];
     }
+    async function saveRetained(season: number, amount: number | null) {
+        retained.value = await window.db['retained:save'](season, amount) as RetainedSalary[];
+    }
 
-    return { ceilings, ceilingFor, isSet, current, load, save };
+    return { ceilings, retained, ceilingFor, isSet, current, retainedFor, currentRetained, load, save, saveRetained };
 });
 
 export const useContractStore = defineStore('contracts', () => {

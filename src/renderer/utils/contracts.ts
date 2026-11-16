@@ -76,7 +76,8 @@ export interface OutlookYear {
     nhlTotal: number;
     buried: number;         // AHL salary above the exemption
     extensions: number;     // accepted extensions kicking in, plus accepted FAs not yet signed
-    committed: number;      // what counts against the cap
+    committed: number;      // what counts against the cap from our contracts
+    retained: number;       // salary retained in trades, also against the cap
     space: number;
     pending: number;        // outstanding offers (extensions and free agents)
     spaceIfAccepted: number;
@@ -93,6 +94,7 @@ export interface OutlookInput {
     freeAgents: FreeAgent[];
     season: number;
     ceilingFor?: (season: number) => number; // the season's cap; default for all if omitted
+    retainedFor?: (season: number) => number; // salary retained in trades; none if omitted
     // Leave an offer out, to judge it on its own
     excludePlayerId?: number;
     excludeFreeAgentId?: number;
@@ -116,6 +118,7 @@ export function capOutlook(input: OutlookInput): OutlookYear[] {
             season: season + i,
             cap: input.ceilingFor?.(season + i) ?? CAP_CEILING,
             nhl: { FWD: 0, DEF: 0, G: 0 }, nhlTotal: 0, buried: 0, extensions: 0, committed: 0,
+            retained: input.retainedFor?.(season + i) ?? 0,
             space: 0, pending: 0, spaceIfAccepted: 0, ahlSalary: 0, itsSalary: 0,
             contracts: 0, exempt: 0, expiring: 0,
         };
@@ -155,7 +158,7 @@ export function capOutlook(input: OutlookInput): OutlookYear[] {
 
         y.nhlTotal = y.nhl.FWD + y.nhl.DEF + y.nhl.G;
         y.committed = y.nhlTotal + y.buried + y.extensions;
-        y.space = y.cap - y.committed;
+        y.space = y.cap - y.committed - y.retained;
         y.spaceIfAccepted = y.space - y.pending;
         years.push(y);
     }

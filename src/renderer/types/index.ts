@@ -277,6 +277,12 @@ export interface CapCeiling {
     ceiling: number; // $M
 }
 
+// Salary kept on our books after trading a player away
+export interface RetainedSalary {
+    season: number;
+    amount: number; // $M
+}
+
 export type FAStatus = 'RFA' | 'UFA';
 export type ExtensionStatus = 'Negotiating' | 'Offered' | 'Accepted' | 'Declined' | 'Letting go';
 export type FreeAgentStatus = 'Shortlisted' | 'Offered' | 'Accepted' | 'Declined' | 'Signed elsewhere';

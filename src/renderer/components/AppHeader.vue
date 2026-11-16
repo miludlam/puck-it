@@ -26,10 +26,10 @@ const nhlRosterCount = computed(() =>
     playerStore.nhlRosterCount
 );
 const capSpace = computed(() =>
-    formatCap(capStore.current - playerStore.nhlCapHit)
+    formatCap(capStore.current - capStore.currentRetained - playerStore.nhlCapHit)
 );
 const capSpaceNegative = computed(() =>
-    playerStore.nhlCapHit > capStore.current
+    playerStore.nhlCapHit + capStore.currentRetained > capStore.current
 );
 
 const showModal = ref(false);
