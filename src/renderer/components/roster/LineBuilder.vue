@@ -6,6 +6,7 @@ import LineBuilderLines from './LineBuilderLines.vue';
 import LineBuilderPool from './LineBuilderPool.vue';
 import LineBuilderScratches from "./LineBuilderScratches.vue";
 import LineBuilderIR from './LineBuilderIR.vue';
+import LineBuilderAdvice from './LineBuilderAdvice.vue';
 import ContextMenu, { ContextMenuItem } from '@/components/ContextMenu.vue';
 import PlayerModal from './PlayerModal.vue';
 import { MAX_ROSTER, MIN_ROSTER } from '@/utils/league';
@@ -206,6 +207,8 @@ async function handleDrop(playerID: number, fromSlot: string | null, toSlot: str
                 Clear lines
             </button>
         </div>
+        <LineBuilderAdvice :league="league" :slotMap="slotMap" />
+
         <div class="flex gap-6 p-6">
 
             <!-- Left column — lines + scratches -->

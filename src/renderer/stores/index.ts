@@ -88,6 +88,11 @@ export const usePlayerStore = defineStore('players', () => {
         patchPlayer(result.player);
         if (result.occupant) patchPlayer(result.occupant);
     }
+    // Replace a league's lines with slot → player assignments; IR is kept
+    async function setLines(league: LineLeague, lineup: Record<string, Player>) {
+        const assignments = Object.entries(lineup).map(([slot, p]) => ({ id: p.id, slot }));
+        players.value = await window.db['player:setLines'](league, assignments) as Player[];
+    }
     // Injured reserve (`${league}-IR`) isn't a line, so it survives a clear
     async function clearLines(league: LineLeague) {
         const onLine = (p: Player) => p.line_league === league && p.line_slot !== `${league}-IR`;
@@ -112,7 +117,7 @@ export const usePlayerStore = defineStore('players', () => {
         players,
         nhl, ahl, its,
         contractCount, exemptContractCount, nhlCapHit, nhlRosterCount,
-        load, add, update, remove, assignSlot, clearLines, clearAll, importAll,
+        load, add, update, remove, assignSlot, setLines, clearLines, clearAll, importAll,
     };
 });
 

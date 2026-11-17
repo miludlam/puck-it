@@ -747,6 +747,17 @@ function clearDraftClass(keepUndrafted: boolean) {
     return getAllScoutedPlayers();
 }
 
+// Replace a league's lines in one go (IR is left alone); returns every player
+function setLines(league: string, assignments: { id: number; slot: string }[]) {
+    db.transaction(() => {
+        db.prepare(`UPDATE players SET line_slot = NULL, line_league = NULL WHERE line_league = ? AND line_slot != ?`)
+            .run(league, `${league}-IR`);
+        const assign = db.prepare('UPDATE players SET line_slot = ?, line_league = ? WHERE id = ? AND roster_league = ?');
+        for (const { id, slot } of assignments) assign.run(slot, league, id, league);
+    })();
+    return getAllPlayers();
+}
+
 /**********************
  * Contract Handlers *
  **********************/
@@ -1074,6 +1085,7 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'player:delete': (_: null, id: number) => deletePlayer(id),
     'player:clearAll': () => clearAllPlayers(),
     'player:import': (_: null, players: Record<string, unknown>[], replace: boolean) => importPlayers(players, replace),
+    'player:setLines': (_: null, league: string, assignments: { id: number; slot: string }[]) => setLines(league, assignments),
     'player:assignSlot': (
         _: null,
         playerID: number,
