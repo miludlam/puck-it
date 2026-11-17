@@ -20,6 +20,12 @@ const TIER_VALUE = [10, 9, 7, 5, 3, 1, 1, 1, 1, 1, 1];
 // How much to trust a potential reading
 const CHANCE_FACTOR: Record<PotentialChance, number> = { Exact: 1, High: 0.9, Med: 0.75, Low: 0.55 };
 
+/** A potential reading's worth on a 0–10 scale, discounted by how sure the reading is */
+export function potentialValue(position: Position, level: PotentialLevel | '' | null, chance: PotentialChance | '' | null) {
+    const index = level ? POTENTIAL_TIERS[groupOf(position)].indexOf(level) : -1;
+    return (index === -1 ? 1 : TIER_VALUE[index]) * (chance ? CHANCE_FACTOR[chance] : 0.75);
+}
+
 // Is this an NHL-calibre potential (top three tiers below Franchise/Elite included)?
 export const isNhlPotential = (group: Group, level: PotentialLevel | '' | null) =>
     !!level && POTENTIAL_TIERS[group].indexOf(level) !== -1 && POTENTIAL_TIERS[group].indexOf(level) <= 3;
@@ -129,10 +135,7 @@ const TARGETS_PER_PICK = 3;
 
 function prospectValue(p: ScoutedPlayer, draftSize: number): { value: number; reason: string | null } {
     if (p.position && p.potential_level) {
-        const index = POTENTIAL_TIERS[groupOf(p.position)].indexOf(p.potential_level);
-        const tier = index === -1 ? 1 : TIER_VALUE[index];
-        const chance = p.potential_chance ? CHANCE_FACTOR[p.potential_chance] : 0.75;
-        return { value: tier * chance, reason: `${p.potential_level}${p.potential_chance ? ` (${p.potential_chance})` : ''}` };
+        return { value: potentialValue(p.position, p.potential_level, p.potential_chance), reason: `${p.potential_level}${p.potential_chance ? ` (${p.potential_chance})` : ''}` };
     }
     // Potential unknown — fall back on Central Scouting, scaled below a known Top-tier read
     const rank = p.cs_rank ?? draftSize;

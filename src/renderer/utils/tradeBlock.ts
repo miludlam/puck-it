@@ -1,5 +1,6 @@
 import { Pick, Player, Position, TeamStatus } from '@/types';
 import { analyzeRoster } from '@/utils/draftTargets';
+import { assessRoster } from '@/utils/rosterCore';
 
 // NHL lineup slots per position (12F / 6D / 2G); one extra per position is normal depth
 export const NHL_SLOTS: Record<Position, number> = { C: 4, LW: 4, RW: 4, LD: 3, RD: 3, G: 2 };
@@ -108,13 +109,18 @@ export function evaluateTradeBlock(
         }
     };
 
-    for (const p of players.filter(p => p.on_block)) add(p, 'On the block', true);
+    // Core players are only shopped when put on the block by hand
+    const core = new Set(assessRoster(players, status).assessments.filter(a => a.tier === 'Core').map(a => a.player.id));
+    for (const p of players.filter(p => p.on_block)) {
+        add(p, 'On the block', true);
+        if (core.has(p.id)) add(p, 'Core piece — sure about moving him?', true);
+    }
 
     // Surplus extras: the lowest-rated players beyond slots + 1 at a crowded position
     for (const position of surplus) {
         const atPos = nhl.filter(p => p.position === position).sort((a, b) => a.overall - b.overall);
         const extras = atPos.length - (NHL_SLOTS[position] + 1);
-        for (const p of atPos.slice(0, extras)) add(p, `Surplus at ${position} (${atPos.length} for ${NHL_SLOTS[position]} spots)`);
+        for (const p of atPos.slice(0, extras).filter(p => !core.has(p.id))) add(p, `Surplus at ${position} (${atPos.length} for ${NHL_SLOTS[position]} spots)`);
     }
 
     // A player's rank on the NHL depth chart at their position (0 = best)
@@ -125,6 +131,7 @@ export function evaluateTradeBlock(
 
     for (const p of nhl) {
         if (p.clause === 'NMC' && !p.on_block) continue; // not suggested without consent
+        if (core.has(p.id) && !p.on_block) continue;
         if (status === 'Rebuild' && p.age >= SELL_AGE && p.years_remaining <= 2) {
             add(p, `${p.age}-year-old on ${p.years_remaining <= 1 ? 'an expiring deal' : 'a short deal'} — sell for futures`);
         }

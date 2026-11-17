@@ -8,6 +8,7 @@ import {
 import { groupOf, POTENTIAL_TIERS } from '@/utils/draftTargets';
 import { formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
 import { evaluateTradeBlock } from '@/utils/tradeBlock';
+import { assessRoster } from '@/utils/rosterCore';
 import { analyzeTrade, Verdict } from '@/utils/tradeAnalysis';
 
 const props = defineProps<{ initialPlayerIds: number[]; initialPickIds: number[] }>();
@@ -228,6 +229,11 @@ const warnings = computed(() => {
     if (impact.value.contracts > MAX_CONTRACTS) list.push(`${impact.value.contracts} contracts — over the ${MAX_CONTRACTS} limit`);
     if (impact.value.exempt > MAX_EXEMPT_CONTRACTS) list.push(`${impact.value.exempt} exempt contracts — over ${MAX_EXEMPT_CONTRACTS}`);
     for (const p of outPlayers.value) if (p.clause) list.push(`${p.last_name} has a ${p.clause}`);
+    if (outPlayers.value.length) {
+        const status = franchiseStore.franchise?.team_status ?? 'Bubble';
+        const core = assessRoster(playerStore.players, status).assessments.filter(a => a.tier === 'Core').map(a => a.player.id);
+        for (const p of outPlayers.value) if (core.includes(p.id)) list.push(`${p.last_name} is a core piece (Roster → Analysis)`);
+    }
     return list;
 });
 

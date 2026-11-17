@@ -4,10 +4,11 @@ import { Player } from '@/types';
 import { usePlayerStore } from "@/stores";
 import AllPlayersTable from '@/components/roster/AllPlayersTable.vue';
 import LineBuilder from '@/components/roster/LineBuilder.vue';
+import RosterAnalysis from '@/components/roster/RosterAnalysis.vue';
 import PlayerModal from '@/components/roster/PlayerModal.vue';
 import ImportModal from '@/components/ImportModal.vue';
 
-type RosterTab = 'all' | 'nhl' | 'ahl' | 'its';
+type RosterTab = 'all' | 'nhl' | 'ahl' | 'its' | 'analysis';
 const activeTab = ref<RosterTab>('all');
 
 const playerStore = usePlayerStore();
@@ -58,7 +59,7 @@ const itsByGroup = computed(() => {
         <div class="flex items-center justify-between mb-6">
             <div class="flex gap-1 p-1 bg-slate-800/50 rounded-lg">
                 <button
-                    v-for="tab in (['all', 'nhl', 'ahl', 'its'] as const)"
+                    v-for="tab in (['all', 'nhl', 'ahl', 'its', 'analysis'] as const)"
                     :key="tab"
                     class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors uppercase"
                     :class="activeTab === tab
@@ -101,6 +102,7 @@ const itsByGroup = computed(() => {
         <AllPlayersTable v-if="activeTab === 'all'" @edit-player="openEdit" />
         <LineBuilder v-else-if="activeTab === 'nhl'" league="NHL" />
         <LineBuilder v-else-if="activeTab === 'ahl'" league="AHL" />
+        <RosterAnalysis v-else-if="activeTab === 'analysis'" @edit-player="openEdit" />
 
         <div v-else-if="activeTab === 'its'" class="space-y-6">
             <p class="text-xs text-slate-500">
