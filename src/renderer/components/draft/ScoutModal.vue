@@ -37,6 +37,7 @@ const form = reactive({
 async function save() {
     const payload = {
         ...form,
+        ...(form.status === 'shortlisted' && { region: null, region_locked: false }),
         region_ratings: Object.fromEntries(
             Object.entries(form.region_ratings).filter(([, v]) => v !== undefined)
         ),
@@ -61,7 +62,7 @@ async function remove() {
         <div class="bg-slate-900 rounded-xl w-[560px] max-h-[90vh] overflow-y-auto p-6 space-y-6">
             <div class="flex items-center justify-between">
                 <h2 class="text-base font-semibold">
-                    {{ props.scout ? 'Edit Scout' : form.status === 'offered' ? 'Offer Contract' : 'Add Scout' }}
+                    {{ props.scout ? 'Edit Scout' : form.status === 'offered' ? 'Offer Contract' : form.status === 'shortlisted' ? 'Shortlist Scout' : 'Add Scout' }}
                 </h2>
                 <button class="text-slate-400 hover:text-slate-200 transition-colors" @click="emit('close')">✕</button>
             </div>
@@ -90,9 +91,11 @@ async function remove() {
                         <select v-model="form.status" :class="inputClass">
                             <option value="hired">On payroll</option>
                             <option value="offered">Contract offered</option>
+                            <option value="shortlisted">Shortlisted</option>
                         </select>
                     </div>
-                    <div>
+                    <!-- Shortlisted scouts get a recommended region on the Scouts tab instead -->
+                    <div v-if="form.status !== 'shortlisted'">
                         <label class="block text-xs text-slate-400 mb-1">
                             {{ form.status === 'offered' ? 'Target Region' : 'Assigned Region' }}
                         </label>

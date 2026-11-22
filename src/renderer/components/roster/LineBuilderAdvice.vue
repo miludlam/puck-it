@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { useContractStore, useFranchiseStore, usePlayerStore } from '@/stores';
 import { LineLeague, Player } from '@/types';
-import { lineSlots, reviewLineup, suggestLineup } from '@/utils/lineSuggest';
+import { explainLineup, lineSlots, reviewLineup, suggestLineup } from '@/utils/lineSuggest';
 import { assessRoster, LineupMove } from '@/utils/rosterCore';
 
 const props = defineProps<{
@@ -37,6 +37,11 @@ const previewRows = computed(() => {
         ...(s.scratches.length ? [{ label: 'Scr', keys: s.scratches }] : []),
     ];
 });
+
+// Why the lineup works — the suggestion while previewing, otherwise the lines as set
+const plan = computed(() => explainLineup(suggestion.value ?? props.slotMap, props.league));
+const planFor = (label: string) => plan.value.lines.find(l => l.label === label);
+const hasPlan = computed(() => plan.value.lines.length > 0);
 
 const busy = ref(false);
 async function apply() {
@@ -99,29 +104,73 @@ const issueCount = computed(() => notes.value.length + moves.value.length);
                 <div class="overflow-x-auto">
                     <table class="text-xs border-collapse">
                         <tbody>
-                            <tr v-for="row in previewRows" :key="row.label">
-                                <td class="pr-3 py-0.5 text-slate-500">{{ row.label }}</td>
-                                <td
-                                    v-for="key in row.keys"
-                                    :key="key"
-                                    class="pr-4 py-0.5 whitespace-nowrap"
-                                    :class="changed(key) ? 'text-sky-300' : 'text-slate-400'"
-                                >
-                                    <template v-if="suggestion[key]">
-                                        {{ short(suggestion[key]) }}
-                                        <span class="text-slate-500">{{ suggestion[key].player_type }} {{ suggestion[key].overall }}</span>
-                                    </template>
-                                    <span v-else class="text-slate-600">—</span>
-                                </td>
-                            </tr>
+                            <template v-for="row in previewRows" :key="row.label">
+                                <tr>
+                                    <td class="pr-3 pt-1.5 text-slate-500 align-top">{{ row.label }}</td>
+                                    <td
+                                        v-for="key in row.keys"
+                                        :key="key"
+                                        class="pr-4 pt-1.5 whitespace-nowrap align-top"
+                                        :class="changed(key) ? 'text-sky-300' : 'text-slate-400'"
+                                    >
+                                        <template v-if="suggestion[key]">
+                                            {{ short(suggestion[key]) }}
+                                            <span class="text-slate-500">{{ suggestion[key].player_type }} {{ suggestion[key].overall }}</span>
+                                        </template>
+                                        <span v-else class="text-slate-600">—</span>
+                                    </td>
+                                    <td v-if="row.keys.length === 2" />
+                                    <td class="pt-1.5 align-top whitespace-nowrap">
+                                        <template v-if="planFor(row.label)">
+                                            <span class="text-slate-200">{{ planFor(row.label)!.identity }}</span>
+                                            <span v-if="planFor(row.label)!.mentoring" class="ml-2 text-[10px] uppercase tracking-wider text-emerald-400/80">Mentoring</span>
+                                        </template>
+                                    </td>
+                                </tr>
+                                <tr v-if="planFor(row.label)?.reasons.length">
+                                    <td />
+                                    <td colspan="4" class="pb-1 text-slate-500">{{ planFor(row.label)!.reasons.join(' · ') }}</td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
                 <p class="text-xs text-slate-500">
                     Best players highest, natural positions, and a mix of types: a playmaker and a shooter on each top-nine line,
-                    offensive D with a defensive partner.<template v-if="status === 'Rebuild'"> Rebuilding, so young players with NHL potential win close calls.</template>
+                    offensive D with a defensive partner, and young players beside a veteran who covers for them.<template v-if="status === 'Rebuild'"> Rebuilding, so young players with NHL potential win close calls.</template>
                     The game doesn't publish line chemistry, so treat this as a starting point.
                 </p>
+            </div>
+
+            <!-- The plan: line identities (for the lines as set), special teams, goalies, depth -->
+            <div v-if="hasPlan" class="space-y-3">
+                <h4 class="text-xs text-slate-500">Game plan{{ suggestion ? ' · for the suggested lines' : '' }}</h4>
+
+                <ul v-if="!suggestion" class="space-y-1">
+                    <li v-for="line in plan.lines" :key="line.label" class="text-sm">
+                        <span class="text-slate-500 mr-2">{{ line.label }}</span>
+                        <span class="text-slate-200">{{ line.identity }}</span>
+                        <span v-if="line.mentoring" class="ml-2 text-[10px] uppercase tracking-wider text-emerald-400/80">Mentoring</span>
+                        <span v-if="line.reasons.length" class="block pl-7 text-xs text-slate-500">{{ line.reasons.join(' · ') }}</span>
+                    </li>
+                </ul>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div v-for="[title, units] in ([['Power play', plan.powerPlay], ['Penalty kill', plan.penaltyKill]] as const)" :key="title">
+                        <h5 class="text-xs text-slate-500 mb-1">{{ title }}</h5>
+                        <p v-for="unit in units" :key="unit.label" class="text-xs text-slate-400">
+                            <span class="text-slate-500 mr-2">{{ unit.label }}</span>
+                            <template v-for="(x, i) in unit.players" :key="x.player.id">
+                                <span class="text-slate-200">{{ short(x.player) }}</span>
+                                <span class="text-slate-500"> {{ x.role }}</span><template v-if="i < unit.players.length - 1">, </template>
+                            </template>
+                        </p>
+                    </div>
+                </div>
+
+                <div v-if="plan.goalies.length || plan.depth.length">
+                    <p v-for="text in [...plan.goalies, ...plan.depth]" :key="text" class="text-sm text-slate-400">{{ text }}</p>
+                </div>
             </div>
 
             <!-- Call-ups -->

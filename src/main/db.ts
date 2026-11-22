@@ -154,7 +154,7 @@ function baselineSchema() {
             region_ratings  TEXT    DEFAULT NULL,  -- JSON blob
             region          TEXT    DEFAULT NULL,  -- currently assigned region
             region_locked   INTEGER NOT NULL DEFAULT 0,  -- 1 = skip during auto-assign
-            status          TEXT    NOT NULL DEFAULT 'hired',  -- 'hired' | 'offered' (region = target region; contracts aren't region-specific)
+            status          TEXT    NOT NULL DEFAULT 'hired',  -- 'hired' | 'offered' (region = target region; contracts aren't region-specific) | 'shortlisted'
             assignment_end  TEXT    DEFAULT NULL  -- 'MM-DD' the scout's shortlist assignment ends (no year)
         );
 

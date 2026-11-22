@@ -21,10 +21,12 @@ const horizons = computed(() => [
 
 interface Row { player: Player; ext: Extension | null; fa: ReturnType<typeof faStatusOf> }
 
-// Expiring players, plus anyone already in talks (an early extension)
+// Expiring players, plus anyone already in talks (an early extension). Looking two seasons
+// out leaves off this season's expiring deals — without a new deal they're already gone.
 const rows = computed<Row[]>(() =>
     playerStore.players
         .filter(p => {
+            if (horizon.value === 2 && p.years_remaining < 2) return false;
             const ext = contractStore.extensionFor(p.id);
             if (ext) return p.years_remaining <= horizon.value || ext.status === 'Accepted' || ext.status === 'Offered';
             return p.aav > 0 && p.years_remaining <= horizon.value;

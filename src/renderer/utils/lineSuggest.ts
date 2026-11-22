@@ -84,10 +84,58 @@ const PAIR_WEIGHT = [1.4, 1.2, 1.0];
 
 const count = (line: Player[], ...types: string[]) => line.filter(p => types.includes(p.player_type)).length;
 
+// Young players with NHL potential develop best beside a veteran who covers for them
+const VETERAN_AGE = 28;
+const developing = (p: Player) => p.age <= YOUTH_AGE && isNhlPotential(groupOf(p.position), p.potential_level);
+const veteran = (p: Player) => p.age >= VETERAN_AGE;
+// A young player already rated above the veterans around them doesn't need covering for
+const mentoring = (line: Player[]) => {
+    const vets = line.filter(veteran);
+    const young = line.filter(p => developing(p) && vets.some(v => v.overall > p.overall));
+    return { vets: vets.filter(v => young.some(p => v.overall > p.overall)), young };
+};
+// Only a tiebreaker: matching potential matters more for development
+const mentorFit = (line: Player[]) => mentoring(line).young.length ? 0.1 : 0;
+
+// Players still developing grow best on a line that matches their potential. Their current
+// game role caps how far potential can pull them up — one line above it — so an Elite
+// prospect in a depth role isn't rushed onto the top line.
+const DEVELOPMENT_AGE = 25;
+const POTENTIAL_WEIGHT = 0.75; // overall points per line below where they should be
+const POTENTIAL_LINE: Record<string, number> = {
+    Franchise: 1, Elite: 1, 'Top 6': 2, 'Top 9': 3, 'Bottom 6': 4, // forwards
+    'Top 4': 2, '7th': 3,                                          // defence ('Top 6' is 3 for D)
+};
+const ROLE_LINE: Record<string, number> = {
+    '1st': 1, '2nd': 2, '3rd SCR': 3, '3rd CHK': 3, '4th': 4, // forwards
+    'Top 2': 1, 'Top 4': 2, 'Top 6': 3,                        // defence
+};
+
+/** The line (1-based) a developing player's potential points to, if any */
+function potentialLine(p: Player): number | null {
+    if (p.age > DEVELOPMENT_AGE || !p.potential_level) return null;
+    const isD = groupOf(p.position) === 'DEF';
+    return (isD && p.potential_level === 'Top 6' ? 3 : POTENTIAL_LINE[p.potential_level]) ?? null;
+}
+
+/** The highest line potential should pull a developing player to, once their role caps it */
+export function targetLine(p: Player): number | null {
+    const potential = potentialLine(p);
+    if (!potential) return null;
+    const isD = groupOf(p.position) === 'DEF';
+    const role = p.role.replace(/^m/, ''); // minor-league roles read the same for AHL lines
+    const roleLine = ROLE_LINE[role] ?? (role === 'Depth' ? (isD ? 4 : 5) : null);
+    return roleLine ? Math.max(potential, roleLine - 1) : potential;
+}
+
+const potentialFit = (line: Player[], index: number) =>
+    -POTENTIAL_WEIGHT * line.reduce((sum, p) => sum + Math.max(0, index + 1 - (targetLine(p) ?? Infinity)), 0);
+
 /** How well a forward line's types fit together, in overall points */
 function forwardFit(line: Player[], index: number): number {
-    if (index === 3) return 0.5 * count(line, 'GRN', 'ENF'); // a checking fourth line
-    let fit = 0;
+    const shared = mentorFit(line) + potentialFit(line, index);
+    if (index === 3) return 0.5 * count(line, 'GRN', 'ENF', 'PWF') + shared; // a checking fourth line
+    let fit = shared;
     fit += count(line, 'PLY') ? 1 : count(line, 'TWF') ? 0.4 : 0;  // someone to create
     fit += count(line, 'SNP') ? 1 : count(line, 'PWF') ? 0.5 : 0;  // someone to finish
     fit += count(line, 'TWF', 'PWF', 'GRN') ? 0.5 : 0;             // someone to win pucks back
@@ -99,7 +147,8 @@ function forwardFit(line: Player[], index: number): number {
 const PAIR_FIT: Record<string, number> = {
     'DFD+OFD': 1, 'OFD+TWD': 0.6, 'DFD+TWD': 0.6, 'TWD+TWD': 0.5, 'DFD+DFD': 0, 'OFD+OFD': -0.5,
 };
-const pairFit = (pair: Player[]) => PAIR_FIT[pair.map(p => p.player_type).sort().join('+')] ?? 0;
+const pairFit = (pair: Player[], index: number) =>
+    (PAIR_FIT[pair.map(p => p.player_type).sort().join('+')] ?? 0) + mentorFit(pair) + potentialFit(pair, index);
 
 /** Best ordering of each position's players into lines (or pairs) */
 function arrange(at: Map<Position, Player[]>, positions: Position[], weights: number[], fit: (line: Player[], i: number) => number, rating: Rating) {
@@ -157,6 +206,205 @@ export interface LineNote {
 }
 
 const short = (p: Player) => `${p.first_name.charAt(0)}. ${p.last_name}`;
+
+export interface LinePlan {
+    label: string;
+    keys: string[];
+    identity: string;
+    mentoring: boolean;
+    reasons: string[];
+}
+
+export interface UnitPlan {
+    label: string;
+    players: { player: Player; role: string }[];
+}
+
+export interface LineupPlan {
+    lines: LinePlan[];
+    powerPlay: UnitPlan[];
+    penaltyKill: UnitPlan[];
+    goalies: string[];
+    depth: string[];
+}
+
+const names = (ps: Player[]) => ps.map(short).join(' and ');
+const verb = (ps: Player[], singular: string, plural: string) => ps.length === 1 ? singular : plural;
+const ofType = (line: Player[], ...types: string[]) => line.filter(p => types.includes(p.player_type));
+
+function offPosition(line: (Player | undefined)[], positions: Position[]): string[] {
+    return line.flatMap((p, i) => p && p.position !== positions[i]
+        ? [`${short(p)} shifts from ${p.position} to ${positions[i]}${p.position2 === positions[i] ? '' : ' — not a position they list'}`] : []);
+}
+
+function mentorReasons(line: Player[], index: number): string[] {
+    const { vets, young } = mentoring(line);
+    if (young.length) return [`${names(vets)} ${verb(vets, 'covers', 'cover')} for ${names(young)} while they develop`];
+    const growing = line.filter(developing);
+    if (growing.length >= 2 && !line.some(veteran)) return [`${names(growing)} are ${growing.length === 2 ? 'both' : 'all'} still developing, with no veteran beside them`];
+    return index === 3 && growing.length ? [`Regular NHL minutes for ${names(growing)} to grow`] : [];
+}
+
+/** Developing players against the line their potential points to */
+function potentialReasons(line: Player[], index: number): string[] {
+    return line.flatMap(p => {
+        const [potential, target] = [potentialLine(p), targetLine(p)];
+        if (!potential || !target) return [];
+        if (index + 1 <= potential) return [`${short(p)}'s ${p.potential_level} potential gets matching minutes`];
+        if (index + 1 <= target) return [`${short(p)} has ${p.potential_level} potential (role: ${p.role}) — as high as they should go for now`];
+        return [`${short(p)} has ${p.potential_level} potential — move up as they improve`];
+    });
+}
+
+type Description = Pick<LinePlan, 'identity' | 'mentoring' | 'reasons'>;
+
+function describeForwards(line: Player[], index: number): Description {
+    const creators = ofType(line, 'PLY');
+    const finishers = ofType(line, 'SNP', 'PWF');
+    const twoWay = ofType(line, 'TWF');
+    const physical = ofType(line, 'GRN', 'ENF', 'PWF');
+    const reasons: string[] = [];
+    let identity: string;
+
+    if (index === 3) {
+        identity = physical.length >= 2 ? 'Energy & forecheck' : line.some(developing) ? 'Development minutes' : 'Checking line';
+        if (physical.length) reasons.push(`${names(physical)} ${verb(physical, 'brings', 'bring')} the physical game`);
+        if (twoWay.length) reasons.push(`${names(twoWay)} ${verb(twoWay, 'keeps', 'keep')} it safe in their own end`);
+    } else {
+        if (creators.length && finishers.length) identity = index === 0 ? 'Top scoring line' : 'Secondary scoring';
+        else if (twoWay.length >= 2) identity = 'Two-way';
+        else if (creators.length >= 2) identity = 'Playmaking';
+        else identity = index === 0 ? 'Top line' : 'Depth scoring';
+
+        if (creators.length && finishers.length) reasons.push(`${names(creators)} ${verb(creators, 'feeds', 'feed')} ${names(finishers)}`);
+        else if (creators.length) reasons.push(`${names(creators)} ${verb(creators, 'drives', 'drive')} play; no natural finisher on the line`);
+        else if (finishers.length) reasons.push(`${names(finishers)} ${verb(finishers, 'shoots', 'shoot')}; no natural playmaker on the line`);
+        if (twoWay.length) reasons.push(`${names(twoWay)} ${verb(twoWay, 'handles', 'handle')} the defensive side and ${verb(twoWay, 'wins', 'win')} pucks back`);
+    }
+
+    return { identity, mentoring: mentoring(line).young.length > 0, reasons: [...reasons, ...mentorReasons(line, index)] };
+}
+
+function describePair(pair: Player[], index: number): Description {
+    const [dfd, ofd, twd] = ['DFD', 'OFD', 'TWD'].map(t => ofType(pair, t));
+    let identity: string, reason: string;
+    if (dfd.length === 1) {
+        const partner = pair.find(p => p !== dfd[0])!;
+        identity = index === 0 ? 'Shutdown & transition' : 'Balanced';
+        reason = `${short(dfd[0])} stays home so ${short(partner)} can join the rush`;
+    } else if (dfd.length === 2) {
+        identity = index === 2 ? 'Penalty-kill pair' : 'Shutdown';
+        reason = 'Two stay-at-home D: hard to play against, little offence';
+    } else if (ofd.length === 2) {
+        identity = 'Offensive';
+        reason = 'Both join the rush, so they can get caught going the other way';
+    } else if (ofd.length && twd.length) {
+        identity = 'Puck-moving';
+        reason = `${short(twd[0])} reads the play behind ${short(ofd[0])}`;
+    } else {
+        identity = 'Two-way';
+        reason = 'Both can move the puck and defend';
+    }
+    return { identity, mentoring: mentoring(pair).young.length > 0, reasons: [reason, ...mentorReasons(pair, index)] };
+}
+
+// Type value on special teams, in overall points
+const PP_VALUE: Record<string, number> = { SNP: 3, PLY: 3, PWF: 2, TWF: 0, GRN: -3, ENF: -4, OFD: 3, TWD: 1, DFD: -2 };
+const PK_VALUE: Record<string, number> = { TWF: 3, GRN: 2, PWF: 1, ENF: 0, SNP: -1, PLY: -1, DFD: 3, TWD: 2, OFD: -2 };
+
+const ranked = (pool: Player[], score: (p: Player) => number) => [...pool].sort((a, b) => score(b) - score(a) || a.id - b.id);
+
+/** A 1-3-1: shooter on the flank, playmaker on the half-wall, a body in front, a bumper in the slot */
+function powerPlayRoles(forwards: Player[], point: Player | undefined): UnitPlan['players'] {
+    const left = [...forwards];
+    const take = (...types: string[]) => {
+        const i = left.findIndex(p => types.includes(p.player_type));
+        return left.splice(i === -1 ? 0 : i, 1)[0];
+    };
+    const shooter = take('SNP', 'PWF');
+    const front = take('PWF', 'GRN', 'ENF', 'TWF');
+    const wall = take('PLY');
+    const bumper = left[0];
+    return [
+        { player: shooter, role: 'One-timer' }, { player: wall, role: 'Half-wall' },
+        { player: bumper, role: 'Bumper' }, { player: front, role: 'Net front' },
+        { player: point!, role: 'Point' },
+    ].filter(x => x.player);
+}
+
+function specialTeams(forwards: Player[], defence: Player[]) {
+    const ppF = ranked(forwards, p => p.overall + (PP_VALUE[p.player_type] ?? 0));
+    const ppD = ranked(defence, p => p.overall + (PP_VALUE[p.player_type] ?? 0));
+    const powerPlay: UnitPlan[] = [0, 1].map(i => ({
+        label: `PP${i + 1}`,
+        players: powerPlayRoles(ppF.slice(i * 4, i * 4 + 4), ppD[i]),
+    })).filter(u => u.players.length);
+
+    // Keep the top power play fresh unless they're clearly the best penalty killers too
+    const onPP1 = new Set(powerPlay[0]?.players.map(x => x.player.id));
+    const pkScore = (p: Player) => p.overall + (PK_VALUE[p.player_type] ?? 0) - (onPP1.has(p.id) ? 2 : 0);
+    const pkF = ranked(forwards, pkScore);
+    const pkD = ranked(defence, pkScore);
+    const penaltyKill: UnitPlan[] = [0, 1].map(i => ({
+        label: `PK${i + 1}`,
+        players: [...pkF.slice(i * 2, i * 2 + 2), ...pkD.slice(i * 2, i * 2 + 2)].map(player => ({ player, role: player.position })),
+    })).filter(u => u.players.length);
+
+    return { powerPlay, penaltyKill };
+}
+
+const SEASON_GAMES = 82;
+
+function goalieWorkload(starter: Player | undefined, backup: Player | undefined): string[] {
+    if (!starter || !backup) return [];
+    const gap = starter.overall - backup.overall;
+    const starts = gap >= 5 ? 60 : gap >= 2 ? 55 : 46;
+    const why = gap >= 5 ? 'the gap is big enough to lean on the starter'
+        : gap >= 2 ? 'enough rest to keep the starter fresh' : 'close to a platoon — ride the hot hand';
+    const notes = [`${short(starter)} about ${starts} starts, ${short(backup)} about ${SEASON_GAMES - starts}: ${why}`];
+    if (developing(backup)) notes.push(`${short(backup)} is ${backup.age} with ${backup.potential_level} potential — extra starts help development`);
+    return notes;
+}
+
+/** Why the lineup is put together the way it is: line identities, special teams, goalies and depth */
+export function explainLineup(slotMap: Record<string, Player | null>, league: LineLeague): LineupPlan {
+    const slots = lineSlots(league);
+    const at = (keys: string[]) => keys.map(k => slotMap[k] ?? undefined);
+    const lines: LinePlan[] = [];
+
+    slots.forwards.forEach((keys, i) => {
+        const line = at(keys);
+        const full = line.filter((p): p is Player => !!p);
+        if (full.length < 3) return;
+        lines.push({ label: `L${i + 1}`, keys, ...describeForwards(full, i) });
+        lines[lines.length - 1].reasons.push(...potentialReasons(full, i), ...offPosition(line, FWD_POSITIONS));
+    });
+    slots.defence.forEach((keys, i) => {
+        const pair = at(keys);
+        const full = pair.filter((p): p is Player => !!p);
+        if (full.length < 2) return;
+        lines.push({ label: `P${i + 1}`, keys, ...describePair(full, i) });
+        lines[lines.length - 1].reasons.push(...potentialReasons(full, i), ...offPosition(pair, D_POSITIONS));
+    });
+
+    const dressed = (keys: string[]) => at(keys).filter((p): p is Player => !!p);
+    const { powerPlay, penaltyKill } = specialTeams(dressed(slots.forwards.flat()), dressed(slots.defence.flat()));
+    const [starter, backup] = at(slots.goalies);
+
+    // Young players in the press box would be better off playing in the AHL
+    const depth = dressed(slots.scratches).filter(developing).map(p => p.waiver_eligible
+        ? `${short(p)} (${p.age}) is developing in the press box, but would need waivers to send down`
+        : `${short(p)} (${p.age}) would develop more playing big AHL minutes than sitting`);
+
+    const finishers = ofType(dressed(slots.forwards.slice(0, 3).flat()), 'SNP', 'PWF');
+    if (slots.forwards.slice(0, 3).flat().every(k => slotMap[k]) && finishers.length < 3) {
+        const who = !finishers.length ? 'No natural shooters (SNP/PWF) in the top nine'
+            : `Only ${names(finishers)} in the top nine ${verb(finishers, 'is a natural shooter', 'are natural shooters')} (SNP/PWF)`;
+        depth.push(`${who} — a scoring winger is the clearest need`);
+    }
+
+    return { lines, powerPlay, penaltyKill, goalies: goalieWorkload(starter, backup), depth };
+}
 const average = (line: Player[]) => line.reduce((s, p) => s + p.overall, 0) / line.length;
 
 /** Things worth a look in the lines as set */

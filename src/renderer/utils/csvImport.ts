@@ -370,7 +370,8 @@ export function parseScouts(text: string): ImportResult<ScoutImport> {
             if (!blank(get('status'))) {
                 const v = norm(get('status'));
                 if (v === 'offered' || v === 'offer') status = 'offered';
-                else if (v !== 'hired') err(`Status "${get('status')}" isn't Hired or Offered`);
+                else if (v === 'shortlisted' || v === 'shortlist') status = 'shortlisted';
+                else if (v !== 'hired') err(`Status "${get('status')}" isn't Hired, Offered or Shortlisted`);
             }
 
             let region: JuniorLeague | null = null;

@@ -7,7 +7,7 @@ import ImportModal from '@/components/ImportModal.vue';
 import ShortlistPlayerModal from '@/components/draft/ShortlistPlayerModal.vue';
 import LockIcon from '@/components/LockIcon.vue';
 import ScoutPhases from '@/components/draft/ScoutPhases.vue';
-import { ALLOTMENT, autoAssignScouts, suggestLockedMoves } from '@/utils/scoutAssignment';
+import { ALLOTMENT, autoAssignScouts, planHiring, suggestLockedMoves } from '@/utils/scoutAssignment';
 
 const scoutStore = useScoutStore();
 const scoutedStore = useScoutedPlayerStore();
@@ -102,6 +102,15 @@ function openAdd(status: ScoutStatus = 'hired') {
     showModal.value = true;
 }
 
+// Offers and shortlist planned together against the payroll
+const hiringPlan = computed(() => planHiring(scoutStore.scouts, ALLOTMENT, MAX_SCOUTS));
+
+function setTarget(scout: Scout, region: JuniorLeague, status: ScoutStatus) {
+    scoutStore.update(scout.id, { status, region });
+}
+
+const initial = (s: Scout) => `${s.first_name.charAt(0)}. ${s.last_name}`;
+
 // Offer accepted — scout joins the payroll, starting in their target region (unlocked, so auto-assign can move them)
 function signOffer(scout: Scout) {
     scoutStore.update(scout.id, { status: 'hired' });
@@ -147,16 +156,6 @@ const sortedScouts = computed(() =>
 
 const unassigned = computed(() =>
     scoutStore.hired.filter(s => !s.region)
-);
-
-// Outstanding offers, in allotment order (no region last)
-const sortedOffers = computed(() =>
-    [...scoutStore.offered].sort((a, b) => {
-        const ia = a.region ? allotmentRegions.indexOf(a.region) : -1;
-        const ib = b.region ? allotmentRegions.indexOf(b.region) : -1;
-        return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib)
-            || a.last_name.localeCompare(b.last_name);
-    })
 );
 
 // Allotment status per region (offers are shown but don't count toward the target)
@@ -310,6 +309,9 @@ const offloadSuggestions = computed(() =>
                 <span v-if="scoutStore.offered.length" class="ml-1 text-amber-500/70 font-normal normal-case">
                     · {{ scoutStore.offered.length }} offered
                 </span>
+                <span v-if="scoutStore.shortlisted.length" class="ml-1 text-violet-400/70 font-normal normal-case">
+                    · {{ scoutStore.shortlisted.length }} shortlisted
+                </span>
             </h2>
             <div class="flex items-center gap-3">
                 <span v-if="assignResult" class="text-xs text-slate-500">{{ assignResult }}</span>
@@ -325,6 +327,10 @@ const offloadSuggestions = computed(() =>
                     class="px-4 py-2 rounded-lg text-sm font-medium border border-sky-500/40 text-sky-300 hover:bg-sky-500/10 transition-colors"
                     @click="shortlistScoutId = null"
                 >+ Shortlist Player</button>
+                <button
+                    class="px-4 py-2 rounded-lg text-sm font-medium border border-violet-500/40 text-violet-300 hover:bg-violet-500/10 transition-colors"
+                    @click="openAdd('shortlisted')"
+                >+ Shortlist Scout</button>
                 <button
                     class="px-4 py-2 rounded-lg text-sm font-medium border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
                     @click="openAdd('offered')"
@@ -508,36 +514,113 @@ const offloadSuggestions = computed(() =>
             </div>
         </div>
 
-        <!-- Contract offers -->
-        <div v-if="sortedOffers.length">
-            <h3 class="text-xs font-medium text-amber-500/70 uppercase tracking-wider mb-3">Contract Offers</h3>
+        <!-- Hiring plan: offers and shortlist judged together against the payroll -->
+        <div v-if="hiringPlan.candidates.length">
+            <h3 class="text-xs font-medium text-violet-400/70 uppercase tracking-wider mb-3">Hiring Plan</h3>
+            <p class="text-xs text-slate-500 mb-3">
+                Offers and shortlisted scouts weighed against each other and the payroll. Unseating a hired scout takes a
+                marked improvement (2+ steps; 1 over an offer); locked scouts stay put.
+                <template v-if="hiringPlan.gain > 0">
+                    Signing the plan lifts coverage <span class="font-medium text-emerald-400">+{{ hiringPlan.gain }}</span>
+                    step{{ hiringPlan.gain === 1 ? '' : 's' }} over the payroll alone.
+                </template>
+            </p>
             <div class="space-y-2">
                 <div
-                    v-for="scout in sortedOffers"
-                    :key="scout.id"
-                    class="flex items-center gap-4 px-4 py-3 bg-amber-500/5 border border-dashed border-amber-500/30 rounded-lg cursor-pointer hover:bg-amber-500/10 transition-colors"
-                    @click="openEdit(scout)"
+                    v-for="a in hiringPlan.candidates"
+                    :key="a.scout.id"
+                    class="flex items-center gap-4 px-4 py-3 border border-dashed rounded-lg cursor-pointer transition-colors"
+                    :class="a.scout.status === 'offered'
+                        ? 'bg-amber-500/5 border-amber-500/30 hover:bg-amber-500/10'
+                        : 'bg-violet-500/5 border-violet-500/30 hover:bg-violet-500/10'"
+                    @click="openEdit(a.scout)"
                 >
-                    <span class="text-sm font-medium text-slate-200 w-36 flex-shrink-0">
-                        {{ scout.first_name }} {{ scout.last_name }}
-                        <span v-if="scout.overall_rating" :class="['text-xs ml-1', ratingColor[scout.overall_rating]]">({{ scout.overall_rating }})</span>
+                    <span class="text-sm font-medium text-slate-200 w-44 flex-shrink-0">
+                        <span
+                            class="mr-1.5 font-medium uppercase tracking-wide text-[10px]"
+                            :class="a.scout.status === 'offered' ? 'text-amber-400/80' : 'text-violet-400/80'"
+                        >{{ a.scout.status === 'offered' ? 'Offer' : 'List' }}</span>
+                        {{ a.scout.first_name }} {{ a.scout.last_name }}
+                        <span v-if="a.scout.overall_rating" :class="['text-xs ml-1', ratingColor[a.scout.overall_rating]]">({{ a.scout.overall_rating }})</span>
                     </span>
-                    <template v-if="scout.region">
-                        <span class="text-xs text-slate-500">Targeting →</span>
-                        <span class="text-xs text-slate-400">{{ scout.region }}</span>
-                        <span v-if="scout.region_ratings[scout.region]"
-                              :class="['text-xs', ratingColor[scout.region_ratings[scout.region]!]]">
-                            {{ scout.region_ratings[scout.region] }}
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                        <template v-if="a.scout.status === 'offered'">
+                            <span class="text-slate-500">Targeting</span>
+                            <span class="text-slate-400">{{ a.scout.region ?? 'no region' }}</span>
+                            <span v-if="a.scout.region && a.scout.region_ratings[a.scout.region]" :class="ratingColor[a.scout.region_ratings[a.scout.region]!]">
+                                {{ a.scout.region_ratings[a.scout.region] }}
+                            </span>
+                            <span class="text-slate-600">·</span>
+                        </template>
+                        <template v-if="a.region">
+                            <span class="text-slate-500">Plan →</span>
+                            <span class="font-medium text-sky-300">{{ a.region }}</span>
+                            <span :class="ratingColor[a.scout.region_ratings[a.region]!]">{{ a.scout.region_ratings[a.region] }}</span>
+                            <template v-if="a.replaces">
+                                <span class="text-slate-600">over</span>
+                                <span class="text-slate-400">{{ initial(a.replaces) }}</span>
+                                <span v-if="a.replaces.region_ratings[a.region]" :class="ratingColor[a.replaces.region_ratings[a.region]!]">
+                                    {{ a.replaces.region_ratings[a.region] }}
+                                </span>
+                                <span v-else class="text-slate-600">unrated</span>
+                                <span v-if="a.replaces.status === 'offered'" class="text-amber-500/70">(offer)</span>
+                            </template>
+                            <span v-else class="text-slate-600">open slot</span>
+                            <span v-if="a.gain > 0" class="text-emerald-400">+{{ a.gain }}</span>
+                        </template>
+                        <span v-else class="text-slate-500">
+                            {{ a.scout.status === 'offered' ? 'No place in the plan — others cover its regions better' : 'Not a marked improvement anywhere' }}
                         </span>
-                        <span v-else class="text-xs text-slate-600">unrated</span>
-                    </template>
-                    <span v-else class="text-xs text-slate-600">No target region</span>
-                    <button
-                        class="ml-auto px-3 py-1 rounded-md text-xs font-medium bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:hover:bg-emerald-700 text-white transition-colors"
-                        :disabled="!canAdd"
-                        :title="canAdd ? 'Offer accepted — add to payroll' : 'Roster full — release a scout first'"
-                        @click.stop="signOffer(scout)"
-                    >Signed</button>
+                        <template v-if="a.unlock">
+                            <span class="text-slate-600">·</span>
+                            <span class="text-amber-400/80">
+                                Unlock {{ a.unlock.locked.map(initial).join(', ') }} to put them in {{ a.unlock.region }}
+                                ({{ a.scout.region_ratings[a.unlock.region] }})
+                            </span>
+                        </template>
+                    </div>
+                    <div class="ml-auto flex flex-shrink-0 gap-2">
+                        <button
+                            v-if="a.scout.status === 'shortlisted' && a.region"
+                            class="px-3 py-1 rounded-md text-xs font-medium border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
+                            :title="`Mark a contract offered, targeting ${a.region}`"
+                            @click.stop="setTarget(a.scout, a.region, 'offered')"
+                        >Offer contract</button>
+                        <button
+                            v-if="a.scout.status === 'offered' && a.region && a.region !== a.scout.region"
+                            class="px-3 py-1 rounded-md text-xs font-medium border border-sky-500/40 text-sky-300 hover:bg-sky-500/10 transition-colors"
+                            @click.stop="setTarget(a.scout, a.region, 'offered')"
+                        >Retarget</button>
+                        <button
+                            v-if="a.scout.status === 'offered'"
+                            class="px-3 py-1 rounded-md text-xs font-medium bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:hover:bg-emerald-700 text-white transition-colors"
+                            :disabled="!canAdd"
+                            :title="canAdd ? 'Offer accepted — add to payroll' : 'Roster full — release a scout first'"
+                            @click.stop="signOffer(a.scout)"
+                        >Signed</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- What the payroll does to fit the plan's hires in -->
+            <div v-if="hiringPlan.moves.length || hiringPlan.releases.length" class="mt-3 px-4 py-3 bg-slate-800/40 border border-slate-700/50 rounded-lg space-y-1.5">
+                <p class="text-xs text-slate-500">To fit them in, once they sign:</p>
+                <div v-for="m in hiringPlan.moves" :key="m.scout.id" class="flex items-center gap-2 text-xs">
+                    <span class="text-slate-200 font-medium">{{ m.scout.first_name }} {{ m.scout.last_name }}</span>
+                    <span class="text-slate-400">{{ m.from ?? 'Unassigned' }}</span>
+                    <span v-if="m.from && m.scout.region_ratings[m.from]" :class="ratingColor[m.scout.region_ratings[m.from]!]">{{ m.scout.region_ratings[m.from] }}</span>
+                    <span class="text-slate-600">→</span>
+                    <span class="text-slate-400">{{ m.to }}</span>
+                    <span v-if="m.to && m.scout.region_ratings[m.to]" :class="ratingColor[m.scout.region_ratings[m.to]!]">{{ m.scout.region_ratings[m.to] }}</span>
+                </div>
+                <div v-for="r in hiringPlan.releases" :key="r.id" class="flex items-center gap-2 text-xs">
+                    <span class="text-rose-400/80">Release</span>
+                    <span class="text-slate-200 font-medium">{{ r.first_name }} {{ r.last_name }}</span>
+                    <span v-if="r.overall_rating" :class="ratingColor[r.overall_rating]">({{ r.overall_rating }})</span>
+                    <span class="text-slate-500">no slot in the plan, payroll over {{ MAX_SCOUTS }}</span>
+                    <span v-if="scoutedStore.forScout(r.id).length" class="text-slate-500">
+                        · {{ scoutedStore.forScout(r.id).length }} prospects lose their scout
+                    </span>
                 </div>
             </div>
         </div>

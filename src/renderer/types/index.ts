@@ -199,7 +199,7 @@ export interface Pick {
 }
 
 // Scout
-export type ScoutStatus = 'hired' | 'offered'; // offered = contract out, not on payroll yet
+export type ScoutStatus = 'hired' | 'offered' | 'shortlisted'; // offered = contract out, not on payroll yet; shortlisted = considering
 
 export interface Scout {
     id: number;

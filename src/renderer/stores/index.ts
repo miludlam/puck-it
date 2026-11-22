@@ -213,6 +213,7 @@ export const useScoutStore = defineStore('scouts', () => {
     // Scouts on the payroll vs. those with an outstanding contract offer
     const hired = computed(() => scouts.value.filter(s => s.status === 'hired'));
     const offered = computed(() => scouts.value.filter(s => s.status === 'offered'));
+    const shortlisted = computed(() => scouts.value.filter(s => s.status === 'shortlisted'));
 
     // Region a scout is working (null if unassigned or no scout)
     const regionOf = (id: number | null | undefined) =>
@@ -241,7 +242,7 @@ export const useScoutStore = defineStore('scouts', () => {
         scouts.value = await window.db['scout:import'](rows, replace) as Scout[];
     }
 
-    return { scouts, hired, offered, regionOf, load, add, update, remove, importAll };
+    return { scouts, hired, offered, shortlisted, regionOf, load, add, update, remove, importAll };
 });
 
 export const useScoutedPlayerStore = defineStore('scoutedPlayers', () => {
