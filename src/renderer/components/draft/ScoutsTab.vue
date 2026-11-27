@@ -12,8 +12,8 @@ import { ALLOTMENT, autoAssignScouts, planHiring, suggestLockedMoves } from '@/u
 const scoutStore = useScoutStore();
 const scoutedStore = useScoutedPlayerStore();
 
-// Shortlist quick add (undefined = closed, null = no scout preselected)
-const shortlistScoutId = ref<number | null | undefined>(undefined);
+// Shortlist quick add for a scout's row (undefined = closed)
+const shortlistScoutId = ref<number | undefined>(undefined);
 
 const showModal = ref(false);
 const selectedScout = ref<Scout | undefined>(undefined);
@@ -313,20 +313,13 @@ const offloadSuggestions = computed(() =>
                     · {{ scoutStore.shortlisted.length }} shortlisted
                 </span>
             </h2>
+            <!-- Data in, then the hiring pipeline in order (shortlist → offer → payroll), then placement -->
             <div class="flex items-center gap-3">
-                <span v-if="assignResult" class="text-xs text-slate-500">{{ assignResult }}</span>
                 <button
-                    v-if="scoutStore.hired.length"
-                    :disabled="assigning"
-                    class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white transition-colors"
-                    title="Assign unlocked scouts to maximize region-rating coverage. Ties go to the higher-overall scout, then to better ratings in higher-target regions."
-                    @click="autoAssign"
-                >Auto-assign</button>
-                <button
-                    v-if="scoutStore.hired.length"
-                    class="px-4 py-2 rounded-lg text-sm font-medium border border-sky-500/40 text-sky-300 hover:bg-sky-500/10 transition-colors"
-                    @click="shortlistScoutId = null"
-                >+ Shortlist Player</button>
+                    class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                    @click="showImport = true"
+                >Import…</button>
+                <span class="h-6 w-px bg-slate-700" aria-hidden="true" />
                 <button
                     class="px-4 py-2 rounded-lg text-sm font-medium border border-violet-500/40 text-violet-300 hover:bg-violet-500/10 transition-colors"
                     @click="openAdd('shortlisted')"
@@ -336,14 +329,20 @@ const offloadSuggestions = computed(() =>
                     @click="openAdd('offered')"
                 >+ Offer Contract</button>
                 <button
-                    class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
-                    @click="showImport = true"
-                >Import…</button>
-                <button
                     v-if="canAdd"
                     class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
                     @click="openAdd()"
                 >+ Add Scout</button>
+                <template v-if="scoutStore.hired.length">
+                    <span class="h-6 w-px bg-slate-700" aria-hidden="true" />
+                    <span v-if="assignResult" class="text-xs text-slate-500">{{ assignResult }}</span>
+                    <button
+                        :disabled="assigning"
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white transition-colors"
+                        title="Assign unlocked scouts to maximize region-rating coverage. Ties go to the higher-overall scout, then to better ratings in higher-target regions."
+                        @click="autoAssign"
+                    >Auto-assign</button>
+                </template>
             </div>
         </div>
 
@@ -845,7 +844,7 @@ const offloadSuggestions = computed(() =>
 
         <ShortlistPlayerModal
             v-if="shortlistScoutId !== undefined"
-            :scout-id="shortlistScoutId ?? undefined"
+            :scout-id="shortlistScoutId"
             @close="shortlistScoutId = undefined"
         />
 

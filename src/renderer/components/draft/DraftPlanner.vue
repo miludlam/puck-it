@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useContractStore, useFranchiseStore, usePickStore, usePlayerStore, useScoutedPlayerStore } from '@/stores';
-import { Pick, ScoutedPlayer } from '@/types';
+import { NHLReadiness, Pick, ScoutedPlayer } from '@/types';
 import { analyzeRoster, FALLER_MARGIN, planPicks, PickPlan } from '@/utils/draftTargets';
 import { rosterAfterDeals } from '@/utils/contracts';
+import { DRAFT_ROUNDS } from '@/utils/draftOrder';
 import LockIcon from '@/components/LockIcon.vue';
 import ScoutedPlayerModal from '@/components/draft/ScoutedPlayerModal.vue';
 import DraftStandings from '@/components/draft/DraftStandings.vue';
+import DraftedPlayer from '@/components/draft/DraftedPlayer.vue';
 
 const franchiseStore = useFranchiseStore();
 const pickStore = usePickStore();
@@ -19,7 +21,7 @@ const roundLabel = (r: number) => ['1st', '2nd', '3rd', '4th', '5th', '6th', '7t
 const teamName = (id: string) => franchiseStore.teams.find(t => t.id === id)?.name ?? id;
 
 const teamCount = computed(() => franchiseStore.teams.length || 32);
-const draftSize = computed(() => teamCount.value * 7);
+const draftSize = computed(() => teamCount.value * DRAFT_ROUNDS);
 
 // Season 25 = 2025-26, whose draft is in 2026
 const draftYear = computed(() =>
@@ -55,7 +57,8 @@ const unrankedCount = computed(() => available.value.length - ranked.value.lengt
 
 // Plan targets for every projected pick, keyed by pick id
 const plans = computed(() => {
-    const projected = myPicks.value.filter(p => p.projected_pick !== null);
+    // Used picks are done; only the rest get targets
+    const projected = myPicks.value.filter(p => p.projected_pick !== null && p.drafted_player_id === null);
     const result = planPicks(projected.map(p => p.projected_pick!), ranked.value, needs.value, draftSize.value);
     // planPicks returns plans in pick order, matching `projected` (already sorted)
     return new Map<number, PickPlan>(projected.map((p, i) => [p.id, result[i]]));
@@ -78,6 +81,16 @@ const pickInRound = (pick: Pick) =>
     pick.projected_pick ? pick.projected_pick - (pick.round - 1) * teamCount.value : null;
 
 const editingProspect = ref<ScoutedPlayer | null>(null);
+
+// Sooner to the NHL reads greener; years out fade toward grey
+const READINESS_CLASS: Record<NHLReadiness, string> = {
+    'NHL Ready': 'text-emerald-300',
+    '1 Year': 'text-emerald-400/80',
+    '2 Years': 'text-sky-300/80',
+    '3 Years': 'text-slate-300',
+    '4 Years': 'text-slate-400',
+    '5 Years': 'text-slate-500',
+};
 </script>
 
 <template>
@@ -159,8 +172,14 @@ const editingProspect = ref<ScoutedPlayer | null>(null);
                     </p>
                 </div>
 
+                <!-- Who it took, once used -->
+                <div v-if="pick.drafted_player_id !== null" class="flex-1 min-w-0 flex items-baseline gap-2 pt-0.5">
+                    <span class="text-[10px] uppercase tracking-wider text-slate-500">Drafted</span>
+                    <DraftedPlayer :player-id="pick.drafted_player_id" />
+                </div>
+
                 <!-- Targets -->
-                <div v-if="plans.get(pick.id)" class="flex-1 min-w-0 space-y-1.5">
+                <div v-else-if="plans.get(pick.id)" class="flex-1 min-w-0 space-y-1.5">
                     <p class="text-[10px] text-slate-600">
                         CS rank {{ plans.get(pick.id)!.window.from }}–{{ plans.get(pick.id)!.window.to ?? 'end' }}
                         (from {{ FALLER_MARGIN }} before the pick to before your next)
@@ -182,8 +201,25 @@ const editingProspect = ref<ScoutedPlayer | null>(null);
                             :class="t.prospect.gem_bust === 'Gem' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'"
                         >{{ t.prospect.gem_bust }}</span>
                         <span v-if="t.mayBeGone" class="text-[10px] text-amber-400/80">may be gone</span>
+                        <div class="basis-full flex flex-wrap gap-x-3 text-[11px] pl-[3.25rem]">
+                            <span>
+                                <span class="text-slate-500">Potential </span>
+                                <template v-if="t.prospect.potential_level">
+                                    <span class="text-slate-200">{{ t.prospect.potential_level }}</span>
+                                    <span v-if="t.prospect.potential_chance" class="text-slate-500"> ({{ t.prospect.potential_chance }})</span>
+                                </template>
+                                <span v-else class="text-amber-400/80">unknown</span>
+                            </span>
+                            <span>
+                                <span class="text-slate-500">Readiness </span>
+                                <span v-if="t.prospect.nhl_readiness" :class="READINESS_CLASS[t.prospect.nhl_readiness]">{{ t.prospect.nhl_readiness }}</span>
+                                <span v-else class="text-slate-600">—</span>
+                            </span>
+                            <span v-if="t.prospect.age"><span class="text-slate-500">Age </span><span class="text-slate-300">{{ t.prospect.age }}</span></span>
+                            <span v-if="t.prospect.junior_league" class="text-slate-400">{{ t.prospect.junior_league }}</span>
+                        </div>
                         <p class="basis-full text-[11px] text-slate-500 pl-[3.25rem]">
-                            {{ t.reasons.length ? t.reasons.join(' · ') : 'Best ranked available — potential unknown' }}
+                            {{ t.reasons.length ? t.reasons.join(' · ') : t.prospect.potential_level ? 'Best potential available' : 'Best ranked available' }}
                         </p>
                     </div>
                     <p v-if="!plans.get(pick.id)!.targets.length" class="text-xs text-slate-600">

@@ -4,6 +4,7 @@ import { usePickStore, useFranchiseStore } from '@/stores';
 import { Pick, DraftRound } from '@/types';
 import PickModal from '@/components/draft/PickModal.vue';
 import DraftPlanner from '@/components/draft/DraftPlanner.vue';
+import DraftedPlayer from '@/components/draft/DraftedPlayer.vue';
 import { readableOn } from '@/utils/theme';
 
 const pickStore = usePickStore();
@@ -118,15 +119,17 @@ function teamColor(id: string): string {
                             class="px-3 py-2 text-center"
                         >
                             <div class="flex flex-col items-center gap-1">
-                                <button
-                                    v-for="pick in picksForCell(year, round)"
-                                    :key="pick.id"
-                                    class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-opacity hover:opacity-75 w-full justify-center"
-                                    :style="{ backgroundColor: teamColor(pick.original_owner), color: readableOn(teamColor(pick.original_owner)) }"
-                                    @click="openEdit(pick)"
-                                >
-                                    {{ teamName(pick.original_owner) }}
-                                </button>
+                                <template v-for="pick in picksForCell(year, round)" :key="pick.id">
+                                    <button
+                                        class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-opacity hover:opacity-75 w-full justify-center"
+                                        :class="{ 'opacity-50': pick.drafted_player_id !== null }"
+                                        :style="{ backgroundColor: teamColor(pick.original_owner), color: readableOn(teamColor(pick.original_owner)) }"
+                                        @click="openEdit(pick)"
+                                    >
+                                        {{ teamName(pick.original_owner) }}<template v-if="pick.drafted_player_id !== null && pick.projected_pick"> · #{{ pick.projected_pick }}</template>
+                                    </button>
+                                    <DraftedPlayer v-if="pick.drafted_player_id !== null" :player-id="pick.drafted_player_id" />
+                                </template>
                                 <span v-if="picksForCell(year, round).length === 0" class="text-slate-700 text-xs">—</span>
                             </div>
                         </td>
@@ -139,7 +142,12 @@ function teamColor(id: string): string {
                             v-for="year in years"
                             :key="year"
                             class="px-3 py-2 text-center text-xs font-medium text-slate-400"
-                        >{{ owned.filter(p => p.year === year).length }}</td>
+                        >
+                            {{ owned.filter(p => p.year === year).length }}
+                            <span v-if="owned.some(p => p.year === year && p.drafted_player_id !== null)" class="text-slate-600">
+                                ({{ owned.filter(p => p.year === year && p.drafted_player_id !== null).length }} used)
+                            </span>
+                        </td>
                     </tr>
                 </tfoot>
             </table>

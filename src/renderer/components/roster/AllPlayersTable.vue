@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { POTENTIAL_TIERS } from '@/utils/draftTargets';
+import { positionBadge, POTENTIAL_TIERS } from '@/utils/draftTargets';
 import { computed, ref, Ref } from "vue";
 import { usePlayerStore } from "@/stores";
 import { League, Player, PlayerStatus, Position } from "@/types";
@@ -365,11 +365,7 @@ const filteredAndSorted = computed(() => {
                         <template v-else-if="col.key === 'position'">
                             <span
                                 class="px-2 py-0.5 rounded text-xs font-medium"
-                                :class="{
-                                    'bg-blue-500/20 text-blue-300':   getPositionGroup(player.position) === 'FWD',
-                                    'bg-violet-500/20 text-violet-300':  getPositionGroup(player.position) === 'DEF',
-                                    'bg-emerald-500/20 text-emerald-300': getPositionGroup(player.position) === 'G',
-                                }"
+                                :class="positionBadge(player.position)"
                             >{{ player.position }}{{ player.position2 ? ` / ${player.position2}` : '' }}</span>
                         </template>
                         <template v-else>

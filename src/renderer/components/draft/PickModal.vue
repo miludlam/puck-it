@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
-import { usePickStore, useFranchiseStore } from '@/stores';
+import { computed, reactive, ref } from 'vue';
+import { usePickStore, useFranchiseStore, usePlayerStore } from '@/stores';
 import { DraftRound, Pick } from '@/types';
 
 const pickStore = usePickStore();
 const franchiseStore = useFranchiseStore();
+const playerStore = usePlayerStore();
 
 const props = defineProps<{ pick?: Pick }>();
 const emit = defineEmits<{ close: []; saved: [] }>();
@@ -20,7 +21,15 @@ const form = reactive({
     original_owner: props.pick?.original_owner ?? myTeamID,
     current_owner: props.pick?.current_owner ?? myTeamID,
     notes: props.pick?.notes ?? null as string | null,
+    drafted_player_id: props.pick?.drafted_player_id ?? null as number | null,
 });
+
+// Who the pick took: young players (or whoever is set already), youngest first
+const draftees = computed(() =>
+    playerStore.players
+        .filter(p => p.age <= 21 || p.id === form.drafted_player_id)
+        .sort((a, b) => a.age - b.age || a.last_name.localeCompare(b.last_name))
+);
 
 const rounds: DraftRound[] = [1, 2, 3, 4, 5, 6, 7];
 const roundLabel = (r: number) => ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'][r - 1] ?? `${r}th`;
@@ -34,7 +43,8 @@ async function save() {
     if (props.pick) {
         await pickStore.update(props.pick.id, payload);
     } else {
-        await pickStore.add(payload);
+        const { drafted_player_id: _, ...fields } = payload;
+        await pickStore.add(fields);
     }
     emit('saved');
     emit('close');
@@ -86,6 +96,16 @@ async function remove() {
             <div>
                 <label class="block text-xs text-slate-400 mb-1">Notes</label>
                 <input v-model="form.notes" :class="inputClass" placeholder="e.g. acquired via trade for M. Ludlam" />
+            </div>
+
+            <div v-if="props.pick">
+                <label class="block text-xs text-slate-400 mb-1">Drafted player</label>
+                <select v-model="form.drafted_player_id" :class="inputClass">
+                    <option :value="null">Not used yet</option>
+                    <option v-for="p in draftees" :key="p.id" :value="p.id">
+                        {{ p.first_name }} {{ p.last_name }} · {{ p.position }} · {{ p.age }}{{ p.potential_level ? ` · ${p.potential_level}` : '' }}
+                    </option>
+                </select>
             </div>
 
             <div v-if="props.pick" class="pt-3 border-t border-slate-700">

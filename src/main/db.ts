@@ -13,6 +13,8 @@ const MIGRATIONS: (() => void)[] = [
     () => db.exec("CREATE TABLE retained_salary (season INTEGER PRIMARY KEY, amount REAL NOT NULL)"),
     // 4: the game edition, whose salary rules differ; franchises from before it are NHL 26
     () => db.exec("ALTER TABLE franchise ADD COLUMN game INTEGER NOT NULL DEFAULT 26"),
+    // 5: who each pick took; no foreign key, so the pick stays used once that player is traded
+    () => db.exec("ALTER TABLE picks ADD COLUMN drafted_player_id INTEGER DEFAULT NULL"),
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 export const LATEST_GAME = 27; // new franchises start on this edition
@@ -512,7 +514,7 @@ function advanceSeason() {
  ***********************/
 function mapPick(row: unknown) {
     const pick = row as Record<string, unknown>;
-    return { ...pick, locked: Boolean(pick.locked) };
+    return { ...pick, locked: Boolean(pick.locked), drafted_player_id: pick.drafted_player_id ?? null };
 }
 
 function getAllPicks() {

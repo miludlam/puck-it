@@ -61,7 +61,7 @@ const togglePick = (id: number) => { outPickIds.value = toggled(outPickIds.value
 
 const myPicks = computed(() =>
     pickStore.picks
-        .filter(p => p.current_owner === myTeam.value)
+        .filter(p => p.current_owner === myTeam.value && p.drafted_player_id === null)
         .sort((a, b) => normalizeYear(a.year) - normalizeYear(b.year) || a.round - b.round)
 );
 

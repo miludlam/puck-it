@@ -18,7 +18,7 @@ const normalizeYear = (y: number) => y < 100 ? 2000 + y : y;
 const roundLabel = (r: number) => ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th'][r - 1] ?? `${r}th`;
 const draftYear = computed(() => normalizeYear((franchiseStore.franchise?.season ?? 25) + 1));
 const myTeam = computed(() => franchiseStore.franchise?.team_id ?? null);
-const myPicks = computed(() => pickStore.picks.filter(p => p.current_owner === myTeam.value));
+const myPicks = computed(() => pickStore.picks.filter(p => p.current_owner === myTeam.value && p.drafted_player_id === null));
 
 const capStore = useCapStore();
 const capSpace = computed(() => capStore.current - capStore.currentRetained - playerStore.nhlCapHit);

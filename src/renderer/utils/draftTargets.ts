@@ -5,7 +5,16 @@ type Group = 'FWD' | 'DEF' | 'G';
 export const groupOf = (position: Position): Group =>
     position === 'G' ? 'G' : position === 'LD' || position === 'RD' ? 'DEF' : 'FWD';
 
-const POSITIONS: Position[] = ['C', 'LW', 'RW', 'LD', 'RD', 'G'];
+// Position badge colours by group, shared by the roster table and the draft board
+const POSITION_BADGE: Record<Group, string> = {
+    FWD: 'bg-blue-500/20 text-blue-300',
+    DEF: 'bg-violet-500/20 text-violet-300',
+    G:   'bg-emerald-500/20 text-emerald-300',
+};
+export const positionBadge = (position: Position | null) =>
+    position ? POSITION_BADGE[groupOf(position)] : 'bg-slate-700/60 text-slate-400';
+
+const POSITIONS: Position[] =['C', 'LW', 'RW', 'LD', 'RD', 'G'];
 
 // Potential tiers per position group, best first. The player forms, filters and sorting all use these.
 export const POTENTIAL_TIERS: Record<Group, PotentialLevel[]> = {
@@ -133,13 +142,11 @@ export interface PickPlan {
 export const FALLER_MARGIN = 5;
 const TARGETS_PER_PICK = 3;
 
-function prospectValue(p: ScoutedPlayer, draftSize: number): { value: number; reason: string | null } {
-    if (p.position && p.potential_level) {
-        return { value: potentialValue(p.position, p.potential_level, p.potential_chance), reason: `${p.potential_level}${p.potential_chance ? ` (${p.potential_chance})` : ''}` };
-    }
+function prospectValue(p: ScoutedPlayer, draftSize: number): number {
+    if (p.position && p.potential_level) return potentialValue(p.position, p.potential_level, p.potential_chance);
     // Potential unknown — fall back on Central Scouting, scaled below a known Top-tier read
     const rank = p.cs_rank ?? draftSize;
-    return { value: 5 * Math.max(0.1, 1 - rank / draftSize), reason: null };
+    return 5 * Math.max(0.1, 1 - rank / draftSize);
 }
 
 /**
@@ -168,9 +175,9 @@ export function planPicks(
         );
 
         const scored = candidates.map(p => {
-            const { value, reason: potentialReason } = prospectValue(p, draftSize);
+            // Potential, readiness and Gem/Bust are shown beside the name; reasons are the fit
+            const value = prospectValue(p, draftSize);
             const reasons: string[] = [];
-            if (potentialReason) reasons.push(potentialReason);
 
             let fit = 0;
             if (p.position) {
@@ -188,7 +195,6 @@ export function planPicks(
 
             // Scouting verdicts: gems outperform their read, busts fall short of it
             const verdict = p.gem_bust === 'Gem' ? 1.25 : p.gem_bust === 'Bust' ? 0.5 : 1;
-            if (p.gem_bust) reasons.unshift(p.gem_bust);
 
             // Potential leads; fit multiplies it. A tiny CS-rank term breaks ties toward the
             // better-ranked prospect.

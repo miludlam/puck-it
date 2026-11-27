@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Player } from '@/types';
+import { positionBadge } from '@/utils/draftTargets';
 
 const props = defineProps<{
     player: Player;
@@ -31,11 +32,7 @@ function onDragStart(event: DragEvent) {
         <!-- Position badge -->
         <span
             class="px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0"
-            :class="{
-                'bg-sky-500/20 text-sky-300':     ['C', 'LW', 'RW'].includes(props.player.position),
-                'bg-amber-500/20 text-amber-300': ['LD', 'RD'].includes(props.player.position),
-                'bg-emerald-500/20 text-emerald-300': props.player.position === 'G',
-            }"
+            :class="positionBadge(props.player.position)"
         >
             {{ props.player.position }}{{ props.player.position2 ? `/${props.player.position2}` : '' }}
         </span>

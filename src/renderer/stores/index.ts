@@ -188,7 +188,7 @@ export const usePickStore = defineStore('picks', () => {
         picks.value = result as Pick[];
     }
     // Projection fields default in the DB (unset, unlocked)
-    async function add(pick: Omit<Pick, 'id' | 'projected_pick' | 'locked'>) {
+    async function add(pick: Omit<Pick, 'id' | 'projected_pick' | 'locked' | 'drafted_player_id'>) {
         const result = await window.db['pick:add'](pick);
         if (result) picks.value = [...picks.value, result as Pick];
         return result as Pick | null;

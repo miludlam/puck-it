@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useScoutedPlayerStore, useScoutStore } from '@/stores';
 import { Scout, ScoutedPlayer } from '@/types';
 import { leagueGaps, ScoutOption } from '@/utils/gapFill';
@@ -14,7 +14,15 @@ const gaps = computed(() => leagueGaps(scoutedStore.scoutedPlayers, scoutStore.h
 const freeScouts = computed(() => scoutStore.hired.filter(s => s.obligations_done));
 const unscoutedCount = computed(() => gaps.value.reduce((n, g) => n + g.prospects.length, 0));
 
-const open = ref(true);
+// Hidden or shown stays as last left, on this machine (like the theme preference)
+const OPEN_KEY = 'puck-it.gapFillOpen';
+const readOpen = () => {
+    try { return localStorage.getItem(OPEN_KEY) !== 'false'; } catch { return true; }
+};
+const open = ref(readOpen());
+watch(open, value => {
+    try { localStorage.setItem(OPEN_KEY, String(value)); } catch { /* not remembered, still toggles */ }
+});
 const busy = ref(false);
 const error = ref<string | null>(null);
 

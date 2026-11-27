@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useFranchiseStore, useScoutedPlayerStore, useScoutStore, usePlayerStore } from '@/stores';
-import { GemBust, isRefined, Player, PlayerType, PotentialChance, PotentialLevel, ScoutedPlayer } from '@/types';
-import { groupOf, PLAYER_TYPES } from '@/utils/draftTargets';
+import { useFranchiseStore, usePlayerStore, useScoutedPlayerStore, useScoutStore } from '@/stores';
+import { GemBust, JuniorLeague, Player, PlayerType, Position, ScoutedPlayer } from '@/types';
+import { groupOf, PLAYER_TYPES, positionBadge } from '@/utils/draftTargets';
 import ScoutedPlayerModal from '@/components/draft/ScoutedPlayerModal.vue';
 import PlayerModal from '@/components/roster/PlayerModal.vue';
+import DraftPlayerModal from '@/components/draft/DraftPlayerModal.vue';
 import GapFillPanel from '@/components/draft/GapFillPanel.vue';
 import { isUnscouted, rankScoutsFor } from '@/utils/gapFill';
+import { DRAFT_ROUNDS } from '@/utils/draftOrder';
+import { boardIssues, worstLevel } from '@/utils/boardIssues';
 
 const scoutedStore = useScoutedPlayerStore();
 const scoutStore = useScoutStore();
@@ -15,22 +18,14 @@ const franchiseStore = useFranchiseStore();
 
 const showModal = ref(false);
 const selectedPlayer = ref<ScoutedPlayer | undefined>(undefined);
-const draftConfirmId = ref<number | null>(null);
-// Overall is always known once a player is drafted in-game, so it's entered at confirm
-const draftOverall = ref<number | ''>('');
-const validOverall = computed(() =>
-    typeof draftOverall.value === 'number' && draftOverall.value >= 1 && draftOverall.value <= 99
-);
-
-function startDraft(sp: ScoutedPlayer) {
-    draftConfirmId.value = sp.id;
-    draftOverall.value = '';
-}
-
-// Scoutable fields still unknown at the draft (overall is entered at confirm)
-const hasUnknowns = (sp: ScoutedPlayer) => !isRefined(sp);
-// Newly drafted player opened for editing when the prospect had unknown fields
+// Drafting opens a modal for the revealed overall and the pick used. A prospect with
+// unknown fields opens the new player's edit form afterwards to fill them in.
+const drafting = ref<ScoutedPlayer | null>(null);
 const draftedPlayer = ref<Player | null>(null);
+function onDrafted(player: Player, needsEdit: boolean) {
+    drafting.value = null;
+    if (needsEdit) draftedPlayer.value = player;
+}
 
 function scoutName(id: number | null): string {
     if (!id) return '—';
@@ -64,49 +59,9 @@ function onClose() {
     addRank.value = undefined;
 }
 
-// Fog of war: prospects can be drafted with fields still unknown. Drafted players always
-// enter ITS with no contract. Overall comes from the confirm prompt; other unknowns get
-// placeholders (blank potential/type) and the new player's edit form opens to fill them in.
-async function draftPlayer(sp: ScoutedPlayer) {
-    if (!validOverall.value) return;
-    const created = await playerStore.add({
-        first_name: sp.first_name,
-        last_name: sp.last_name,
-        position: sp.position ?? 'C',
-        position2: sp.position2,
-        age: sp.age ?? 17,
-        roster_league: 'ITS',
-        junior_league: sp.junior_league,
-        overall: draftOverall.value as number,
-        potential_level: sp.potential_level ?? '' as PotentialLevel,
-        potential_chance: sp.potential_chance ?? '' as PotentialChance,
-        player_type: sp.player_type ?? '',
-        role: '',
-        aav: 0,
-        years_remaining: 0,
-        contract_type: null,
-        clause: null,
-        waiver_eligible: 1,
-        status: 'Active',
-        notes: sp.notes,
-        line_slot: null,
-        line_league: null,
-    });
-    await scoutedStore.remove(sp.id);
-    draftConfirmId.value = null;
-    if (hasUnknowns(sp)) draftedPlayer.value = created;
-}
-
 const gemBustClass: Record<GemBust, string> = {
     Gem: 'px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-300',
     Bust: 'px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-500/15 text-rose-300',
-};
-
-const positionColor = (pos: string | null) => {
-    if (!pos) return 'bg-slate-700/60 text-slate-400';
-    if (['C', 'LW', 'RW'].includes(pos)) return 'bg-sky-500/20 text-sky-300';
-    if (['LD', 'RD'].includes(pos)) return 'bg-amber-500/20 text-amber-300';
-    return 'bg-emerald-500/20 text-emerald-300';
 };
 
 // Drafted by another team: stays on the board (greyed) but out of the draft targets
@@ -133,9 +88,76 @@ async function clearClass() {
     keepUndrafted.value = false;
 }
 
+// Entry slips (duplicates, shared CS ranks, fields that don't fit the position), checked
+// across the whole class so a taken duplicate still counts
+const issues = computed(() => boardIssues(scoutedStore.scoutedPlayers, playerStore.players, scoutStore.scouts));
+const issueCounts = computed(() => {
+    const lists = [...issues.value.values()];
+    return {
+        errors: lists.filter(l => worstLevel(l) === 'error').length,
+        warnings: lists.filter(l => worstLevel(l) === 'warning').length,
+    };
+});
+const issueTitle = (sp: ScoutedPlayer) => issues.value.get(sp.id)!.map(i => `${i.level === 'error' ? '✖' : '⚠'} ${i.message}`).join('\n');
+const ISSUE_BADGE = {
+    error: 'bg-rose-500/15 text-rose-300',
+    warning: 'bg-amber-500/15 text-amber-300',
+};
+const onlyFlagged = ref(false);
+const showFlagged = computed(() => onlyFlagged.value && issues.value.size > 0);
+
+// Filters. Position matches on primary or secondary; FWD/DEF take the whole group.
+type PositionFilter = Position | 'FWD' | 'DEF' | '';
+const POSITION_FILTERS: { value: PositionFilter; label: string }[] = [
+    { value: '', label: 'All positions' },
+    { value: 'FWD', label: 'Forwards' },
+    { value: 'DEF', label: 'Defense' },
+    ...(['C', 'LW', 'RW', 'LD', 'RD', 'G'] as Position[]).map(p => ({ value: p, label: p })),
+];
+const positionFilter = ref<PositionFilter>('');
+const leagueFilter = ref<JuniorLeague | 'none' | ''>('');
+const scoutFilter = ref<number | 'none' | ''>('');
+const filtering = computed(() => !!(positionFilter.value || leagueFilter.value || scoutFilter.value));
+// Set filters stand out so a narrowed board is obvious
+const filterClass = (active: unknown) =>
+    `bg-slate-900 border rounded-md px-2 py-1 focus:outline-none focus:border-sky-500 cursor-pointer ${active ? 'text-slate-100 border-sky-500/60' : 'text-slate-400 border-slate-700'}`;
+function clearFilters() {
+    positionFilter.value = '';
+    leagueFilter.value = '';
+    scoutFilter.value = '';
+}
+
+// Leagues and scouts on the board, so every option has someone to show
+const leagueOptions = computed(() =>
+    [...new Set(scoutedStore.scoutedPlayers.map(p => p.junior_league).filter((l): l is JuniorLeague => l !== null))].sort()
+);
+const hasNoLeague = computed(() => scoutedStore.scoutedPlayers.some(p => p.junior_league === null));
+const scoutOptions = computed(() => {
+    const ids = new Set(scoutedStore.scoutedPlayers.map(p => p.scout_id));
+    return scoutStore.scouts
+        .filter(s => ids.has(s.id))
+        .sort((a, b) => a.last_name.localeCompare(b.last_name));
+});
+const hasUnassigned = computed(() => scoutedStore.scoutedPlayers.some(p => p.scout_id === null));
+
+function matchesPosition(p: ScoutedPlayer) {
+    const f = positionFilter.value;
+    if (!f) return true;
+    const positions = [p.position, p.position2].filter((x): x is Position => x !== null);
+    return f === 'FWD' || f === 'DEF'
+        ? positions.some(x => groupOf(x) === f)
+        : positions.includes(f);
+}
+const matchesFilters = (p: ScoutedPlayer) =>
+    matchesPosition(p)
+    && (!leagueFilter.value || (leagueFilter.value === 'none' ? p.junior_league === null : p.junior_league === leagueFilter.value))
+    && (!scoutFilter.value || (scoutFilter.value === 'none' ? p.scout_id === null : p.scout_id === scoutFilter.value));
+
 // Central Scouting order (projected pick), unranked last, then by name
 const sorted = computed(() =>
-    scoutedStore.scoutedPlayers.filter(p => showTaken.value || !p.taken).sort((a, b) =>
+    scoutedStore.scoutedPlayers.filter(p =>
+        (showTaken.value || !p.taken) && (!showFlagged.value || issues.value.has(p.id)) && matchesFilters(p)
+    ).sort((a, b) =>
         (a.cs_rank ?? Infinity) - (b.cs_rank ?? Infinity)
         || a.last_name.localeCompare(b.last_name)
     )
@@ -146,7 +168,6 @@ const sorted = computed(() =>
 // last pick sits in one plain section with no gaps or drop spots.
 const showGaps = ref(true);
 const teamCount = computed(() => franchiseStore.teams.length || 32);
-const DRAFT_ROUNDS = 7;
 const draftSize = computed(() => teamCount.value * DRAFT_ROUNDS);
 
 // Drag a row to re-rank: drop on an open spot to take that rank, on another prospect to
@@ -194,7 +215,7 @@ type BoardRow =
     | { kind: 'player'; key: string; sp: ScoutedPlayer };
 
 const rows = computed<BoardRow[]>(() => {
-    if (!showGaps.value) return sorted.value.map(sp => ({ kind: 'player', key: `p${sp.id}`, sp }));
+    if (!showGaps.value || showFlagged.value) return sorted.value.map(sp => ({ kind: 'player', key: `p${sp.id}`, sp }));
 
     const occupied = new Set(scoutedStore.scoutedPlayers.map(p => p.cs_rank).filter((r): r is number => r !== null));
     const byRank = new Map<number, ScoutedPlayer[]>();
@@ -232,7 +253,7 @@ const rows = computed<BoardRow[]>(() => {
 
     const pastDraft = sorted.value.filter(sp => sp.cs_rank !== null && sp.cs_rank > last);
     if (pastDraft.length) {
-        result.push({ kind: 'round', key: 'past', label: `Past the draft · CS ${last + 1}+` });
+        result.push({ kind: 'round', key: 'past', label: `Undrafted · CS ${last + 1}+` });
         for (const sp of pastDraft) result.push({ kind: 'player', key: `p${sp.id}`, sp });
     }
 
@@ -274,7 +295,48 @@ const openSpots = computed(() =>
             >+ Add Prospect</button>
         </div>
 
+        <div
+            v-if="issues.size"
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-4 py-2 text-xs"
+            :class="issueCounts.errors ? 'border-rose-500/30 bg-rose-500/5' : 'border-amber-500/30 bg-amber-500/5'"
+        >
+            <span class="font-medium uppercase tracking-wider" :class="issueCounts.errors ? 'text-rose-300' : 'text-amber-300'">Check the board</span>
+            <span class="text-slate-400">
+                <template v-if="issueCounts.errors">{{ issueCounts.errors }} prospect{{ issueCounts.errors === 1 ? '' : 's' }} with errors</template>
+                <template v-if="issueCounts.errors && issueCounts.warnings"> · </template>
+                <template v-if="issueCounts.warnings">{{ issueCounts.warnings }} with warnings</template>
+                <span class="text-slate-600"> — hover a flag for details, click the name to fix</span>
+            </span>
+            <label class="ml-auto flex items-center gap-1.5 text-slate-400 cursor-pointer">
+                <input v-model="onlyFlagged" type="checkbox" class="accent-slate-500" />
+                Flagged only
+            </label>
+        </div>
+
         <GapFillPanel />
+
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="text-slate-500">Filter</span>
+            <select v-model="positionFilter" :class="filterClass(positionFilter)">
+                <option v-for="o in POSITION_FILTERS" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+            <select v-model="leagueFilter" :class="filterClass(leagueFilter)">
+                <option value="">All leagues</option>
+                <option v-for="l in leagueOptions" :key="l" :value="l">{{ l }}</option>
+                <option v-if="hasNoLeague" value="none">No league</option>
+            </select>
+            <select v-model="scoutFilter" :class="filterClass(scoutFilter)">
+                <option value="">All scouts</option>
+                <option v-for="sc in scoutOptions" :key="sc.id" :value="sc.id">
+                    {{ sc.first_name.charAt(0) }}. {{ sc.last_name }}{{ sc.status !== 'hired' ? ` (${sc.status})` : '' }}
+                </option>
+                <option v-if="hasUnassigned" value="none">Unassigned</option>
+            </select>
+            <template v-if="filtering">
+                <span class="text-slate-500">{{ sorted.length }} prospect{{ sorted.length === 1 ? '' : 's' }} match</span>
+                <button type="button" class="text-slate-400 hover:text-slate-200 transition-colors" @click="clearFilters">Clear</button>
+            </template>
+        </div>
 
         <div v-if="sorted.length === 0 && !showGaps"
              class="rounded-xl border border-dashed border-slate-700 p-12 text-center text-slate-500 text-sm">
@@ -342,13 +404,12 @@ const openSpots = computed(() =>
                 </tr>
                 <tr
                     v-else
-                    class="border-b border-slate-800 hover:bg-slate-800/40 transition-colors"
+                    class="border-b border-slate-800 hover:bg-slate-800/40 transition-colors cursor-grab"
                     :class="{
                         'opacity-50': row.sp.taken || draggingId === row.sp.id,
-                        'cursor-grab': draftConfirmId !== row.sp.id,
                         'bg-sky-500/10 outline outline-1 outline-sky-500': dropKey === row.key && draggingId !== row.sp.id,
                     }"
-                    :draggable="draftConfirmId !== row.sp.id"
+                    draggable="true"
                     :title="draggingId === null ? 'Drag to change CS rank' : undefined"
                     @dragstart="onRowDragStart($event, row.sp)"
                     @dragend="onRowDragEnd"
@@ -368,9 +429,15 @@ const openSpots = computed(() =>
                         {{ row.sp.first_name.charAt(0) }}. {{ row.sp.last_name }}
                         <span v-if="row.sp.gem_bust" :class="['ml-1.5', gemBustClass[row.sp.gem_bust]]">{{ row.sp.gem_bust }}</span>
                         <span v-if="row.sp.taken" class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-700 text-slate-300">Taken</span>
+                        <span
+                            v-if="issues.has(row.sp.id)"
+                            class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-help"
+                            :class="ISSUE_BADGE[worstLevel(issues.get(row.sp.id)!)]"
+                            :title="issueTitle(row.sp)"
+                        >{{ worstLevel(issues.get(row.sp.id)!) === 'error' ? '✖' : '⚠' }} {{ issues.get(row.sp.id)!.length }}</span>
                     </td>
                     <td class="px-3 py-2 text-center">
-                        <span class="px-2 py-0.5 rounded text-xs font-medium" :class="positionColor(row.sp.position)">
+                        <span class="px-2 py-0.5 rounded text-xs font-medium" :class="positionBadge(row.sp.position)">
                             {{ row.sp.position ?? '—' }}{{ row.sp.position2 ? `/${row.sp.position2}` : '' }}
                         </span>
                     </td>
@@ -411,36 +478,8 @@ const openSpots = computed(() =>
                         <template v-else>{{ scoutName(row.sp.scout_id) }}</template>
                     </td>
                     <td class="px-3 py-2 text-right">
-                        <template v-if="draftConfirmId === row.sp.id">
-                            <span class="text-xs text-slate-400 mr-2">
-                                Draft this player?
-                                <span v-if="hasUnknowns(row.sp)" class="text-amber-400/80">Some fields unknown</span>
-                            </span>
-                            <label class="text-xs text-slate-500 mr-2">
-                                OVR
-                                <input
-                                    v-model.number="draftOverall"
-                                    type="number"
-                                    min="1"
-                                    max="99"
-                                    class="ml-1 w-14 bg-slate-900 border rounded px-1.5 py-0.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
-                                    :class="validOverall ? 'border-slate-700' : 'border-amber-500/60'"
-                                    @keydown.enter="draftPlayer(row.sp)"
-                                />
-                            </label>
-                            <button
-                                :disabled="!validOverall"
-                                :title="validOverall ? undefined : 'Enter the overall shown in-game after the draft'"
-                                class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white transition-colors mr-1"
-                                @click="draftPlayer(row.sp)"
-                            >Confirm</button>
-                            <button
-                                class="px-2.5 py-1 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
-                                @click="draftConfirmId = null"
-                            >Cancel</button>
-                        </template>
                         <button
-                            v-else-if="row.sp.taken"
+                            v-if="row.sp.taken"
                             class="px-2.5 py-1 rounded text-xs text-slate-400 hover:text-slate-200 transition-colors"
                             title="Mark as still available"
                             @click="setTaken(row.sp, false)"
@@ -453,7 +492,7 @@ const openSpots = computed(() =>
                             >Taken</button>
                             <button
                                 class="px-2.5 py-1 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
-                                @click="startDraft(row.sp)"
+                                @click="drafting = row.sp"
                             >Draft</button>
                         </template>
                     </td>
@@ -491,6 +530,7 @@ const openSpots = computed(() =>
         </div>
 
         <ScoutedPlayerModal v-if="showModal" :player="selectedPlayer" :csRank="addRank" @close="onClose" @saved="onClose" />
+        <DraftPlayerModal v-if="drafting" :prospect="drafting" @close="drafting = null" @drafted="onDrafted" />
         <PlayerModal v-if="draftedPlayer" :player="draftedPlayer" @close="draftedPlayer = null" />
     </div>
 </template>

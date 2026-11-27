@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useFranchiseStore, useScoutedPlayerStore } from '@/stores';
 import { ScoutedPlayer, SHORTLIST_MAX } from '@/types';
 import ShortlistPlayerModal from '@/components/draft/ShortlistPlayerModal.vue';
+import { projectedRoundLabel } from '@/utils/draftOrder';
 
 const props = defineProps<{ scoutId: number }>();
 
@@ -14,7 +15,6 @@ const isFull = computed(() => players.value.length >= SHORTLIST_MAX);
 
 // CS rank ≈ projected pick, so round = ceil(rank / teams in the league)
 const teamCount = computed(() => franchiseStore.teams?.length || 32);
-const projectedRound = (rank: number) => Math.ceil(rank / teamCount.value);
 
 // undefined = closed, null = adding, player = editing
 const modalPlayer = ref<ScoutedPlayer | null | undefined>(undefined);
@@ -47,7 +47,7 @@ const modalPlayer = ref<ScoutedPlayer | null | undefined>(undefined);
                     </td>
                     <td class="px-2 py-1 text-slate-400">{{ player.position ?? '—' }}</td>
                     <td class="px-2 py-1 text-slate-400">{{ player.age ?? '—' }}</td>
-                    <td class="px-2 py-1 text-slate-500">{{ player.cs_rank ? `Rd ${projectedRound(player.cs_rank)}` : '—' }}</td>
+                    <td class="px-2 py-1 text-slate-500">{{ player.cs_rank ? projectedRoundLabel(player.cs_rank, teamCount) : '—' }}</td>
                     <td class="px-2 py-1 text-slate-500">{{ player.player_type ?? '—' }}</td>
                 </tr>
             </tbody>

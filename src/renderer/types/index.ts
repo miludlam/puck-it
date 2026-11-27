@@ -196,6 +196,7 @@ export interface Pick {
     notes: string | null;
     projected_pick: number | null; // overall pick number, projected from standings
     locked: boolean;               // pick position finalized
+    drafted_player_id: number | null; // the player taken with it (null = not used yet)
 }
 
 // Scout
