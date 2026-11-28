@@ -15,6 +15,13 @@ const MIGRATIONS: (() => void)[] = [
     () => db.exec("ALTER TABLE franchise ADD COLUMN game INTEGER NOT NULL DEFAULT 26"),
     // 5: who each pick took; no foreign key, so the pick stays used once that player is traded
     () => db.exec("ALTER TABLE picks ADD COLUMN drafted_player_id INTEGER DEFAULT NULL"),
+    // 6: minimum salary and buried AHL exemption set by hand per season; unset seasons carry
+    // the last one forward, falling back to the game's defaults
+    () => db.exec(`CREATE TABLE salary_rules (
+        season            INTEGER PRIMARY KEY,
+        min_salary        REAL DEFAULT NULL,
+        buried_exemption  REAL DEFAULT NULL
+    )`),
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 export const LATEST_GAME = 27; // new franchises start on this edition
@@ -468,8 +475,15 @@ function getFranchise() {
 }
 
 function updateFranchise(teamID: string, season: number) {
-    db.prepare(`UPDATE franchise SET team_id = ?, season = ? WHERE id = 1`)
-        .run(teamID, season);
+    const previous = getFranchise()?.season;
+    db.transaction(() => {
+        db.prepare(`UPDATE franchise SET team_id = ?, season = ? WHERE id = 1`)
+            .run(teamID, season);
+        // Moving the season forward runs the rollover once per season passed
+        if (typeof previous === 'number') {
+            for (let s = previous; s < season; s++) rollOverContracts();
+        }
+    })();
 
     // Generate 6 years of picks if team is being set
     for (let i = 1; i <= 6; i++) {
@@ -495,13 +509,28 @@ function renameFranchise(name: string | null) {
     return getFranchise();
 }
 
+// A season has passed: every contract counts down a year, and accepted extensions whose
+// old deal has now run out become the player's contract
+function rollOverContracts() {
+    db.prepare('UPDATE players SET years_remaining = years_remaining - 1 WHERE years_remaining > 0').run();
+    const starting = db.prepare(`
+        SELECT e.player_id FROM extensions e JOIN players p ON p.id = e.player_id
+        WHERE e.status = 'Accepted' AND e.offer_aav IS NOT NULL AND e.offer_years IS NOT NULL
+          AND p.years_remaining <= 0
+    `).all() as { player_id: number }[];
+    for (const { player_id } of starting) applyExtension(player_id);
+}
+
 function advanceSeason() {
     const franchise = getFranchise() as any;
     const newSeason = franchise.season + 1;
     const newPickYear = newSeason + 6;
 
-    db.prepare('UPDATE franchise SET season = ? WHERE id = 1')
-        .run(newSeason);
+    db.transaction(() => {
+        db.prepare('UPDATE franchise SET season = ? WHERE id = 1')
+            .run(newSeason);
+        rollOverContracts();
+    })();
 
     // Generate picks for the newly available year
     generatePicksForYear(newPickYear, franchise.team_id);
@@ -777,6 +806,24 @@ function saveCapCeiling(season: number, ceiling: number | null) {
     return getAllCapCeilings();
 }
 
+function getAllSalaryRules() {
+    return db.prepare('SELECT * FROM salary_rules ORDER BY season').all();
+}
+
+// One rule for one season; null clears it back to carrying forward. A season with
+// neither rule set is removed.
+function saveSalaryRule(season: number, field: 'min_salary' | 'buried_exemption', value: number | null) {
+    if (field !== 'min_salary' && field !== 'buried_exemption') throw new Error(`Unknown salary rule ${field}`);
+    db.transaction(() => {
+        db.prepare(`
+            INSERT INTO salary_rules (season, ${field}) VALUES (?, ?)
+            ON CONFLICT(season) DO UPDATE SET ${field} = excluded.${field}
+        `).run(season, value);
+        db.prepare('DELETE FROM salary_rules WHERE min_salary IS NULL AND buried_exemption IS NULL').run();
+    })();
+    return getAllSalaryRules();
+}
+
 function getAllRetainedSalary() {
     return db.prepare('SELECT * FROM retained_salary ORDER BY season').all();
 }
@@ -831,14 +878,22 @@ function startExtension(playerID: number) {
     if (!ext || ext.status !== 'Accepted' || ext.offer_aav === null || ext.offer_years === null) {
         throw new Error('No accepted extension to start');
     }
-    const tx = db.transaction(() => {
-        db.prepare(`
-            UPDATE players SET aav = ?, years_remaining = ?, contract_type = ?, clause = ? WHERE id = ?
-        `).run(ext.offer_aav, ext.offer_years, ext.offer_type, ext.offer_clause, playerID);
-        db.prepare('DELETE FROM extensions WHERE player_id = ?').run(playerID);
-    });
-    tx();
+    db.transaction(() => applyExtension(playerID))();
     return db.prepare('SELECT * FROM players WHERE id = ?').get(playerID);
+}
+
+// Several at once (the Re-sign tab's "start all"), all or none
+function startExtensions(playerIDs: number[]) {
+    return db.transaction(() => playerIDs.map(startExtension))();
+}
+
+function applyExtension(playerID: number) {
+    const ext = db.prepare('SELECT * FROM extensions WHERE player_id = ?').get(playerID) as
+        { offer_aav: number; offer_years: number; offer_type: string | null; offer_clause: string | null };
+    db.prepare(`
+        UPDATE players SET aav = ?, years_remaining = ?, contract_type = ?, clause = ? WHERE id = ?
+    `).run(ext.offer_aav, ext.offer_years, ext.offer_type, ext.offer_clause, playerID);
+    db.prepare('DELETE FROM extensions WHERE player_id = ?').run(playerID);
 }
 
 function getAllFreeAgents() {
@@ -1129,12 +1184,15 @@ export const dbHandlers: Record<string, (...args: any[]) => unknown> = {
     'scoutedPlayer:clearClass': (_: null, keepUndrafted: boolean) => clearDraftClass(keepUndrafted),
     'capCeiling:getAll': () => getAllCapCeilings(),
     'capCeiling:save': (_: null, season: number, ceiling: number | null) => saveCapCeiling(season, ceiling),
+    'salaryRule:getAll': () => getAllSalaryRules(),
+    'salaryRule:save': (_: null, season: number, field: 'min_salary' | 'buried_exemption', value: number | null) => saveSalaryRule(season, field, value),
     'retained:getAll': () => getAllRetainedSalary(),
     'retained:save': (_: null, season: number, amount: number | null) => saveRetainedSalary(season, amount),
     'extension:getAll': () => getAllExtensions(),
     'extension:save': (_: null, extension: Parameters<typeof saveExtension>[0]) => saveExtension(extension),
     'extension:delete': (_: null, playerID: number) => deleteExtension(playerID),
     'extension:start': (_: null, playerID: number) => startExtension(playerID),
+    'extension:startAll': (_: null, playerIDs: number[]) => startExtensions(playerIDs),
     'freeAgent:getAll': () => getAllFreeAgents(),
     'freeAgent:add': (_: null, agent: Record<string, unknown>) => addFreeAgent(agent),
     'freeAgent:update': (_: null, id: number, agent: Record<string, unknown>) => updateFreeAgent(id, agent),

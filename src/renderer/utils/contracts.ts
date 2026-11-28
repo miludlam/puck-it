@@ -8,10 +8,10 @@ export const MAX_SALARY_SHARE = 0.2;   // of the cap
 export const MAX_TERM_RESIGN = 8;       // re-signing your own player
 export const MAX_TERM_FA = 7;           // signing someone else's
 
-// What a contract costs against the NHL cap where the player plays
-export function capCharge(league: League, aav: number): number {
+// What a contract costs against the NHL cap where the player plays, in a given season
+export function capCharge(league: League, aav: number, season?: number): number {
     if (league === 'NHL') return aav;
-    if (league === 'AHL') return Math.max(0, aav - ahlCapExemption());
+    if (league === 'AHL') return Math.max(0, aav - ahlCapExemption(season));
     return 0; // ITS players aren't on the cap
 }
 
@@ -128,7 +128,7 @@ export function capOutlook(input: OutlookInput): OutlookYear[] {
             const covered = p.aav > 0 && p.years_remaining > i;
             if (covered) {
                 if (p.roster_league === 'NHL') y.nhl[groupOf(p.position)] += p.aav;
-                if (p.roster_league === 'AHL') { y.ahlSalary += p.aav; y.buried += capCharge('AHL', p.aav); }
+                if (p.roster_league === 'AHL') { y.ahlSalary += p.aav; y.buried += capCharge('AHL', p.aav, y.season); }
                 if (p.roster_league === 'ITS') y.itsSalary += p.aav;
                 countContract(p.roster_league);
                 if (p.years_remaining === i + 1 && ext?.status !== 'Accepted') y.expiring++;
@@ -138,7 +138,7 @@ export function capOutlook(input: OutlookInput): OutlookYear[] {
             if (!ext || ext.offer_aav === null || ext.offer_years === null || p.id === input.excludePlayerId) continue;
             const start = Math.max(0, p.years_remaining);
             if (i < start || i >= start + ext.offer_years) continue;
-            const charge = capCharge(p.roster_league, ext.offer_aav);
+            const charge = capCharge(p.roster_league, ext.offer_aav, y.season);
             if (ext.status === 'Accepted') {
                 y.extensions += charge;
                 countContract(p.roster_league);
@@ -150,7 +150,7 @@ export function capOutlook(input: OutlookInput): OutlookYear[] {
         for (const fa of input.freeAgents) {
             if (fa.offer_aav === null || fa.offer_years === null || fa.id === input.excludeFreeAgentId) continue;
             if (i >= fa.offer_years) continue;
-            const charge = capCharge(fa.target_league, fa.offer_aav);
+            const charge = capCharge(fa.target_league, fa.offer_aav, y.season);
             if (fa.status === 'Accepted') { y.extensions += charge; y.contracts++; }
             else if (fa.status === 'Offered') y.pending += charge;
         }
@@ -226,13 +226,14 @@ export function offerImpact(input: OfferImpactInput): ImpactNote[] {
     // League limits (the max is a share of the cap in the deal's first season)
     const outlook = capOutlook(input);
     const maxSalary = (outlook[input.startOffset]?.cap ?? CAP_CEILING) * MAX_SALARY_SHARE;
-    if (aav < minSalary()) notes.push({ tone: 'bad', text: `Below the ${formatCap(minSalary())} league minimum` });
+    const startSeason = input.season + input.startOffset;
+    if (aav < minSalary(startSeason)) notes.push({ tone: 'bad', text: `Below the ${formatCap(minSalary(startSeason))} league minimum` });
     if (aav > maxSalary) notes.push({ tone: 'bad', text: `Above the ${formatCap(maxSalary)} max (20% of the cap)` });
     const maxTerm = input.isNewContract ? MAX_TERM_FA : MAX_TERM_RESIGN;
     if (years > maxTerm) notes.push({ tone: 'bad', text: `Longer than the ${maxTerm}-year max term` });
 
     // Cap, each season the deal covers (within the outlook)
-    const charge = capCharge(input.league, aav);
+    const charge = capCharge(input.league, aav, startSeason);
     if (input.league !== 'NHL') {
         notes.push({ tone: 'info', text: charge > 0
             ? `${formatCap(charge)} of it counts against the cap while in the AHL`

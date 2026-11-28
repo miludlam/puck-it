@@ -1,15 +1,27 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useFranchiseStore } from '@/stores';
+import { computed, ref } from 'vue';
+import { useContractStore, useFranchiseStore, usePlayerStore } from '@/stores';
 import { Game } from '@/types';
 import { GAMES } from '@/utils/league';
 
 const franchiseStore = useFranchiseStore();
+const playerStore = usePlayerStore();
+const contractStore = useContractStore();
 
 const season = ref<number>(franchiseStore.franchise?.season ?? 25);
 const selectedTeamID = ref<string | null>(franchiseStore.franchise?.team_id ?? null);
 const name = ref(franchiseStore.franchise?.name ?? '');
 const game = ref<Game>(franchiseStore.franchise?.game ?? 27);
+
+// Moving the season forward rolls contracts over once per season passed
+const seasonsAdvanced = computed(() =>
+    franchiseStore.franchise && typeof season.value === 'number' ? Math.max(0, season.value - franchiseStore.franchise.season) : 0
+);
+const extensionsStarting = computed(() => contractStore.extensions.filter(e => {
+    const p = playerStore.players.find(p => p.id === e.player_id);
+    return e.status === 'Accepted' && e.offer_aav !== null && e.offer_years !== null
+        && !!p && p.years_remaining <= seasonsAdvanced.value;
+}).length);
 
 // CSS constants
 const inputClass = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500";
@@ -78,6 +90,11 @@ async function save() {
                             :class="inputClass"
                         />
                     </div>
+                    <p v-if="seasonsAdvanced" class="col-span-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/90">
+                        Advancing {{ seasonsAdvanced === 1 ? 'a season' : `${seasonsAdvanced} seasons` }} counts every contract down
+                        {{ seasonsAdvanced === 1 ? 'a year' : `${seasonsAdvanced} years` }}<template v-if="extensionsStarting">
+                        and starts {{ extensionsStarting }} agreed extension{{ extensionsStarting === 1 ? '' : 's' }}</template>.
+                    </p>
                 </div>
             </div>
             <!-- Footer buttons -->

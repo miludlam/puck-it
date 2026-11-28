@@ -72,6 +72,14 @@ async function startDeal(p: Player) {
     await contractStore.startExtension(p.id);
     confirmStartId.value = null;
 }
+
+// Agreed deals whose old contract ends this season (or has already), started together
+const readyToStart = computed(() => rows.value.filter(r => r.ext?.status === 'Accepted' && r.player.years_remaining <= 1));
+const confirmStartAll = ref(false);
+async function startAll() {
+    await contractStore.startExtensions(readyToStart.value.map(r => r.player.id));
+    confirmStartAll.value = false;
+}
 </script>
 
 <template>
@@ -90,6 +98,19 @@ async function startDeal(p: Player) {
             <div class="ml-auto flex gap-4 text-xs text-slate-500">
                 <span v-for="s in summary" :key="s.label">{{ s.label }} <span class="text-slate-200">{{ s.value }}</span></span>
             </div>
+            <template v-if="readyToStart.length">
+                <template v-if="confirmStartAll">
+                    <span class="text-xs text-slate-400">Replace {{ readyToStart.length }} current deal{{ readyToStart.length === 1 ? '' : 's' }}?</span>
+                    <button class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" @click="startAll">Confirm</button>
+                    <button class="px-2.5 py-1 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors" @click="confirmStartAll = false">Cancel</button>
+                </template>
+                <button
+                    v-else
+                    class="px-3 py-1.5 rounded-lg text-xs font-medium border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                    title="Agreed extensions whose current deal ends this season become the players' contracts"
+                    @click="confirmStartAll = true"
+                >Start all agreed deals ({{ readyToStart.length }})</button>
+            </template>
         </div>
 
         <div v-if="!rows.length"
@@ -166,7 +187,8 @@ async function startDeal(p: Player) {
 
         <p class="text-xs text-slate-600">
             Accepted extensions are added to the Cap Outlook from the season after the current deal ends. Use
-            <span class="text-slate-400">Start new deal</span> once the old contract has run out.
+            <span class="text-slate-400">Start new deal</span> once the old contract has run out, or advance the season
+            in Franchise Setup to count contracts down and start them all.
         </p>
 
         <ExtensionModal v-if="editing" :player="editing" @close="editing = null" />

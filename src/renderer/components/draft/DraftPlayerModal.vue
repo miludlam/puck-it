@@ -95,7 +95,8 @@ async function draft() {
                 ...(pickNumber.value !== '' && { projected_pick: pickNumber.value, locked: true }),
             });
         }
-        await scoutedStore.remove(sp.id);
+        // Off the board like any other taken prospect, so the CS spot stays filled
+        await scoutedStore.update(sp.id, { taken: 1 });
         emit('drafted', created, hasUnknowns);
     } finally {
         busy.value = false;

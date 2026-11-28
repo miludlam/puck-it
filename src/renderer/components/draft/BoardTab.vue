@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useFranchiseStore, usePlayerStore, useScoutedPlayerStore, useScoutStore } from '@/stores';
-import { GemBust, JuniorLeague, Player, PlayerType, Position, ScoutedPlayer } from '@/types';
+import { GemBust, isRefined, JuniorLeague, Player, PlayerType, Position, ScoutedPlayer } from '@/types';
 import { groupOf, PLAYER_TYPES, positionBadge } from '@/utils/draftTargets';
 import ScoutedPlayerModal from '@/components/draft/ScoutedPlayerModal.vue';
 import PlayerModal from '@/components/roster/PlayerModal.vue';
@@ -207,6 +207,14 @@ async function dropOnPlayer(target: ScoutedPlayer) {
     ]);
 }
 
+// Scouting coverage of the projected picks: CS 1 to the last pick, every field refined.
+// Counts the whole class (taken included), regardless of filters.
+const coverage = computed(() => {
+    const inDraft = scoutedStore.scoutedPlayers.filter(p => p.cs_rank !== null && p.cs_rank >= 1 && p.cs_rank <= draftSize.value);
+    const refined = inDraft.filter(isRefined).length;
+    return { refined, total: inDraft.length, pct: inDraft.length ? Math.round(refined / inDraft.length * 100) : 0 };
+});
+
 const isPastDraft = (sp: ScoutedPlayer) => sp.cs_rank !== null && sp.cs_rank > draftSize.value;
 
 type BoardRow =
@@ -275,6 +283,12 @@ const openSpots = computed(() =>
     <div class="space-y-4">
         <div class="flex items-center justify-between">
             <h2 class="text-sm font-medium text-slate-400 uppercase tracking-wider">Draft Board</h2>
+            <span
+                v-if="coverage.total"
+                class="ml-4 text-xs cursor-help"
+                :class="coverage.pct === 100 ? 'text-emerald-400' : 'text-slate-400'"
+                :title="`${coverage.refined} of ${coverage.total} prospects ranked CS 1–${draftSize} fully scouted`"
+            >Scouted {{ coverage.pct }}% <span class="text-slate-600">({{ coverage.refined }}/{{ coverage.total }} of CS 1–{{ draftSize }})</span></span>
             <label class="ml-auto mr-4 flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
                 <input v-model="showGaps" type="checkbox" class="accent-slate-500" />
                 Show CS gaps<template v-if="showGaps"> ({{ openSpots }} open of {{ draftSize }})</template>

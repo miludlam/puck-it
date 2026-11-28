@@ -57,10 +57,9 @@ const numberOrNull = (v: unknown) => typeof v === 'number' && !Number.isNaN(v) ?
 async function save(addAnother = false) {
     if (!canSave.value) return;
     error.value = null;
-    // League defaults to the scout's region. Keep one set on the Board, unless it was
-    // just the previous scout's default — then follow the new scout.
+    // League defaults to the scout's region. Prospects never change leagues, so a known
+    // one is kept when the scout changes or is removed.
     const league = props.player?.junior_league ?? null;
-    const followsScout = league === null || league === scoutStore.regionOf(props.player?.scout_id);
     const payload = {
         scout_id: form.scout_id,
         first_name: form.first_name.trim(),
@@ -68,7 +67,7 @@ async function save(addAnother = false) {
         position: form.position,
         age: numberOrNull(form.age),
         cs_rank: numberOrNull(form.cs_rank),
-        junior_league: followsScout ? scoutStore.regionOf(form.scout_id) : league,
+        junior_league: league ?? scoutStore.regionOf(form.scout_id),
     };
     try {
         if (props.player) {

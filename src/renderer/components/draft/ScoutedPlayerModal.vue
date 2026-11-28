@@ -90,11 +90,10 @@ const position2Options = computed(() =>
     }).filter(p => p !== form.position)
 );
 
-// League follows the scout's region unless set to something else by hand
-watch(() => form.scout_id, (scoutID, previousID) => {
-    if (form.junior_league === null || form.junior_league === scoutStore.regionOf(previousID)) {
-        form.junior_league = scoutStore.regionOf(scoutID);
-    }
+// An unknown league defaults to the scout's region. Prospects never change leagues, so
+// a known one stays put when the scout changes or is removed.
+watch(() => form.scout_id, scoutID => {
+    if (form.junior_league === null) form.junior_league = scoutStore.regionOf(scoutID);
 });
 
 watch(positionGroup, () => {

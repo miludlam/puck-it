@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import { ahlCapExemption, CAP_CEILING, game } from "@/utils/league";
-import { CapCeiling, RetainedSalary, DraftSettings, Extension, Franchise, FreeAgent, Game, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStanding, TeamStatus, Trade, TradeRequest } from "@/types";
+import { ahlCapExemption, CAP_CEILING, currentSeason, game, salaryRules } from "@/utils/league";
+import { CapCeiling, RetainedSalary, SalaryRule, DraftSettings, Extension, Franchise, FreeAgent, Game, LineLeague, Pick, Player, Scout, ScoutedPlayer, Team, TeamStanding, TeamStatus, Trade, TradeRequest } from "@/types";
 
 export const usePlayerStore = defineStore('players', () => {
     const players = ref<Player[]>([]);
@@ -131,6 +131,7 @@ export const useFranchiseStore = defineStore('franchise', () => {
         teams.value.find(team => team.id === franchise.value?.team_id) ?? null
     );
     watch(() => franchise.value?.game, g => { if (g) game.value = g; });
+    watch(() => franchise.value?.season, s => { if (s) currentSeason.value = s; });
 
     const formattedSeason = computed(() => {
         const year = franchise.value?.season ?? 25;
@@ -147,8 +148,11 @@ export const useFranchiseStore = defineStore('franchise', () => {
         teams.value = result as Team[];
     }
     async function update(teamID: string, season: number) {
+        const advanced = franchise.value !== null && season > franchise.value.season;
         const result = await window.db['franchise:update'](teamID, season);
         franchise.value = result as Franchise;
+        // The rollover counted contracts down and started agreed extensions
+        if (advanced) await Promise.all([usePlayerStore().load(), useContractStore().load()]);
     }
     async function setStatus(status: TeamStatus) {
         const result = await window.db['franchise:setStatus'](status);
@@ -344,11 +348,20 @@ export const useCapStore = defineStore('cap', () => {
     const retainedFor = (season: number) => retained.value.find(r => r.season === season)?.amount ?? 0;
     const currentRetained = computed(() => retainedFor(useFranchiseStore().franchise?.season ?? 25));
 
+    // Minimum salary and buried AHL exemption carry forward like the cap; the rules live in
+    // league.ts so every cap figure follows them
+    const ruleIsSet = (season: number, field: 'min_salary' | 'buried_exemption') =>
+        salaryRules.value.some(r => r.season === season && r[field] !== null);
+
     async function load() {
-        [ceilings.value, retained.value] = await Promise.all([
+        [ceilings.value, retained.value, salaryRules.value] = await Promise.all([
             window.db['capCeiling:getAll']() as Promise<CapCeiling[]>,
             window.db['retained:getAll']() as Promise<RetainedSalary[]>,
+            window.db['salaryRule:getAll']() as Promise<SalaryRule[]>,
         ]);
+    }
+    async function saveRule(season: number, field: 'min_salary' | 'buried_exemption', value: number | null) {
+        salaryRules.value = await window.db['salaryRule:save'](season, field, value) as SalaryRule[];
     }
     async function save(season: number, ceiling: number | null) {
         ceilings.value = await window.db['capCeiling:save'](season, ceiling) as CapCeiling[];
@@ -357,7 +370,7 @@ export const useCapStore = defineStore('cap', () => {
         retained.value = await window.db['retained:save'](season, amount) as RetainedSalary[];
     }
 
-    return { ceilings, retained, ceilingFor, isSet, current, retainedFor, currentRetained, load, save, saveRetained };
+    return { ceilings, retained, ceilingFor, isSet, current, retainedFor, currentRetained, ruleIsSet, load, save, saveRetained, saveRule };
 });
 
 export const useContractStore = defineStore('contracts', () => {
@@ -393,6 +406,15 @@ export const useContractStore = defineStore('contracts', () => {
         if (index !== -1) playerStore.players[index] = player;
         return player;
     }
+    async function startExtensions(playerIDs: number[]) {
+        const players = await window.db['extension:startAll'](playerIDs) as Player[];
+        extensions.value = extensions.value.filter(e => !playerIDs.includes(e.player_id));
+        const playerStore = usePlayerStore();
+        for (const player of players) {
+            const index = playerStore.players.findIndex(p => p.id === player.id);
+            if (index !== -1) playerStore.players[index] = player;
+        }
+    }
 
     async function addFreeAgent(agent: Omit<FreeAgent, 'id' | 'created_at'>) {
         const created = await window.db['freeAgent:add']({ ...agent }) as FreeAgent;
@@ -420,7 +442,7 @@ export const useContractStore = defineStore('contracts', () => {
 
     return {
         extensions, freeAgents, extensionFor,
-        load, saveExtension, removeExtension, startExtension,
+        load, saveExtension, removeExtension, startExtension, startExtensions,
         addFreeAgent, updateFreeAgent, removeFreeAgent, signFreeAgent,
     };
 });

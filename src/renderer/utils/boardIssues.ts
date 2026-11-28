@@ -49,7 +49,8 @@ export function boardIssues(prospects: ScoutedPlayer[], roster: Player[], scouts
 
     for (const p of prospects) {
         const match = rostered.get(nameKey(p.first_name, p.last_name));
-        if (match) flag(p, 'warning', `Same name as ${fullName(match)} on your roster (${match.roster_league}) — already drafted?`);
+        // A taken prospect on the roster is one we drafted
+        if (match && !p.taken) flag(p, 'warning', `Same name as ${fullName(match)} on your roster (${match.roster_league}) — already drafted?`);
 
         if (p.cs_rank !== null && p.original_cs_rank === null) flag(p, 'warning', 'CS rank without an original rank — movement can\'t be tracked');
         if (p.cs_rank !== null && p.cs_rank < 1) flag(p, 'error', `CS rank ${p.cs_rank} is below 1`);

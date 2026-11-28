@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useCapStore, useContractStore, useFranchiseStore, usePlayerStore } from '@/stores';
 import { capOutlook, OutlookYear, seasonLabel } from '@/utils/contracts';
-import { ahlCapExemption, formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS } from '@/utils/league';
+import { ahlCapExemption, BURIED_ALLOWANCE, formatCap, MAX_CONTRACTS, MAX_EXEMPT_CONTRACTS, minSalary } from '@/utils/league';
 
 const playerStore = usePlayerStore();
 const contractStore = useContractStore();
@@ -32,6 +32,22 @@ function setRetained(season: number, raw: string) {
     capStore.saveRetained(season, value);
 }
 
+// Blank clears the season back to carrying the previous rule forward
+function setRule(season: number, field: 'min_salary' | 'buried_exemption', raw: string) {
+    const value = raw.trim() === '' ? null : Number(raw);
+    if (value !== null && (!Number.isFinite(value) || value < 0)) return;
+    capStore.saveRule(season, field, value);
+}
+
+// Editable per-season salary rules, below the cap
+const ruleRows: { field: 'min_salary' | 'buried_exemption'; label: string; title: string; value: (season: number) => number }[] = [
+    { field: 'min_salary', label: 'Min salary', value: s => minSalary(s), title: 'League minimum salary — blank a season to carry the previous one forward' },
+    {
+        field: 'buried_exemption', label: 'Buried exemption', value: s => ahlCapExemption(s),
+        title: `How much of an AHL salary is exempt from the cap (buried) — defaults to the minimum salary + ${formatCap(BURIED_ALLOWANCE)}`,
+    },
+];
+
 // Cap figures in $M, three decimals like the rest of the app
 const money = (v: number) => v === 0 ? '—' : v.toFixed(3);
 const spaceClass = (v: number) => v < 0 ? 'text-rose-400' : v < 2 ? 'text-amber-400' : 'text-emerald-400';
@@ -50,7 +66,7 @@ const committedRows: Row[] = [
     { label: 'Defence', value: y => money(y.nhl.DEF), indent: true, class: 'text-slate-400' },
     { label: 'Goalies', value: y => money(y.nhl.G), indent: true, class: 'text-slate-400' },
     { label: 'NHL', value: y => money(y.nhlTotal), class: 'text-slate-200' },
-    { label: 'Buried AHL', value: y => money(y.buried), class: 'text-slate-400', title: `AHL salary above the ${formatCap(ahlCapExemption())} exemption` },
+    { label: 'Buried AHL', value: y => money(y.buried), class: 'text-slate-400', title: 'AHL salary above each season\'s buried exemption' },
     { label: 'Extensions & signings', value: y => money(y.extensions), class: 'text-sky-300', title: 'Accepted extensions (from the season after the current deal) and accepted free agents not yet signed' },
     { label: 'Committed', value: y => money(y.committed), class: 'text-slate-100 font-medium', divider: true },
 ];
@@ -142,6 +158,23 @@ const usedPct = (y: OutlookYear) => Math.min(100, ((y.committed + y.retained) / 
                                 />
                             </td>
                         </tr>
+                        <tr v-for="rule in gi === 1 ? ruleRows : []" :key="rule.field">
+                            <td class="px-3 py-1 text-xs text-slate-500 pl-6" :title="rule.title">{{ rule.label }}</td>
+                            <td v-for="y in outlook" :key="y.season" class="px-1 py-1 text-right">
+                                <input
+                                    :value="capStore.ruleIsSet(y.season, rule.field) ? rule.value(y.season).toFixed(3) : ''"
+                                    :placeholder="rule.value(y.season).toFixed(3)"
+                                    type="number"
+                                    min="0"
+                                    step="0.025"
+                                    :class="[inputClass, capStore.ruleIsSet(y.season, rule.field) ? 'text-slate-200' : 'text-slate-500 placeholder:text-slate-500']"
+                                    :aria-label="`${rule.label} ${seasonLabel(y.season)}`"
+                                    :title="capStore.ruleIsSet(y.season, rule.field) ? 'Set for this season — clear to carry the previous one' : 'Carried from the previous season or the game default — type to set'"
+                                    @change="setRule(y.season, rule.field, ($event.target as HTMLInputElement).value)"
+                                    @keydown.enter="($event.target as HTMLInputElement).blur()"
+                                />
+                            </td>
+                        </tr>
                         <tr
                             v-for="row in group"
                             :key="row.label"
@@ -171,7 +204,7 @@ const usedPct = (y: OutlookYear) => Math.min(100, ((y.committed + y.retained) / 
         </div>
 
         <p class="text-xs text-slate-600">
-            A contract with N years remaining covers this season and the next N − 1. Seasons you haven't set carry the previous cap forward. Future seasons assume today's roster placement.
+            A contract with N years remaining covers this season and the next N − 1. Seasons you haven't set carry the previous cap, minimum salary and buried exemption forward. Future seasons assume today's roster placement.
         </p>
     </div>
 </template>

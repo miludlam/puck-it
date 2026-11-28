@@ -283,6 +283,13 @@ export interface CapCeiling {
 }
 
 // Salary kept on our books after trading a player away
+// Set by hand for a season; null fields carry the previous season's rule forward
+export interface SalaryRule {
+    season: number;
+    min_salary: number | null;        // $M
+    buried_exemption: number | null;  // $M of an AHL salary that doesn't count against the cap
+}
+
 export interface RetainedSalary {
     season: number;
     amount: number; // $M
